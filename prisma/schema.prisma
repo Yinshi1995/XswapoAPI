@@ -1,0 +1,373 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --- Enums ---
+
+enum CoinStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum NetworkStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TransactionStatus {
+  CREATED
+  DETECTED
+  PENDING
+  BROADCASTED
+  CONFIRMED
+  FAILED
+  CANCELLED
+}
+
+enum ExchangeRequestStatus {
+  CREATED
+  WAITING_DEPOSIT
+  DEPOSIT_DETECTED
+  UNDERPAID
+  OVERPAID
+  REFUND_PENDING
+  PARTIALLY_REFUNDED
+  REFUNDED
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum TransactionType {
+  CLIENT_DEPOSIT
+  CLIENT_REFUND
+  TRANSFER_TO_BINANCE
+  CLIENT_PAYOUT
+  GAS_TOPUP
+}
+
+enum SubscriptionType {
+  ADDRESS_EVENT
+  INCOMING_FUNGIBLE_TX
+  INCOMING_NATIVE_TX
+}
+
+enum WalletStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum GasWalletType {
+  MASTER
+  AUXILIARY
+}
+
+// --- Models ---
+
+model User {
+  id             Int      @id @default(autoincrement())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  name           String?
+  email          String   @unique
+  hashedPassword String?
+  role           String   @default("USER")
+  status         String   @default("ACTIVE")
+
+  tokens   Token[]
+  sessions Session[]
+}
+
+model Session {
+  id                 Int       @id @default(autoincrement())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  expiresAt          DateTime?
+  handle             String    @unique
+  hashedSessionToken String?
+  antiCSRFToken      String?
+  publicData         String?
+  privateData        String?
+
+  user   User? @relation(fields: [userId], references: [id])
+  userId Int?
+}
+
+model Token {
+  id          Int      @id @default(autoincrement())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  hashedToken String
+  type        String
+  expiresAt   DateTime
+  sentTo      String
+
+  user   User @relation(fields: [userId], references: [id])
+  userId Int
+
+  @@unique([hashedToken, type])
+}
+
+model Coin {
+  id        String     @id @default(cuid())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  code      String     @unique
+  name      String
+  imageUrl  String?
+  status    CoinStatus @default(ACTIVE)
+
+  floatFeePercent  Decimal  @default(0)
+  fixedFeePercent  Decimal  @default(0)
+  minimumFee       Decimal  @default(0)
+  minDepositAmount Decimal  @default(0)
+  maxDepositAmount Decimal?
+
+  manualReviewAmount Decimal?
+  updatedBy          String?
+
+  mappings      CoinNetworkMapping[]
+  incomingTx    Transaction[]        @relation("IncomingCoin")
+  outgoingTx    Transaction[]        @relation("OutgoingCoin")
+  fromRequests  ExchangeRequest[]    @relation("FromCoin")
+  toRequests    ExchangeRequest[]    @relation("ToCoin")
+  masterWallets MasterWallet[]
+}
+
+model Network {
+  id                String        @id @default(cuid())
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  code              String        @unique
+  name              String
+  chain             String
+  tatumWalletSlug   String?
+  status            NetworkStatus @default(ACTIVE)
+  isDepositEnabled  Boolean       @default(true)
+  isWithdrawEnabled Boolean       @default(true)
+  explorerUrl       String?
+  nativeCoin        String?
+  confirmationRules Json?
+  imageUrl          String?
+  lastSyncedAt      DateTime?
+  kucoinChainCode   String?
+
+  mappings            CoinNetworkMapping[]
+  transactions        Transaction[]
+  masterWallets       MasterWallet[]
+  gasWallets          GasWallet[]
+  toExchangeRequest   ExchangeRequest[]    @relation("ToNetwork")
+  fromExchangeRequest ExchangeRequest[]    @relation("FromNetwork")
+}
+
+model CoinNetworkMapping {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coinId    String
+  networkId String
+  coin      Coin    @relation(fields: [coinId], references: [id])
+  network   Network @relation(fields: [networkId], references: [id])
+
+  contractAddress    String?
+  decimals           Int     @default(18)
+  isActive           Boolean @default(true)
+  depositEnabled     Boolean @default(true)
+  withdrawEnabled    Boolean @default(true)
+  binanceNetworkCode String?
+  tatumChainCode     String?
+  processingPriority Int     @default(0)
+  internalComment    String?
+
+  @@unique([coinId, networkId])
+}
+
+model Subscription {
+  id                  String           @id @default(cuid())
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  type                SubscriptionType
+  webhookUrl          String
+  tatumSubscriptionId String           @unique
+  isActive            Boolean          @default(true)
+  chain               String?
+
+  depositAddressId String
+  depositAddress   DepositAddress @relation(fields: [depositAddressId], references: [id])
+
+  exchangeRequestId String?
+  exchangeRequest   ExchangeRequest? @relation(fields: [exchangeRequestId], references: [id])
+}
+
+model Transaction {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  exchangeRequestId String?
+  exchangeRequest   ExchangeRequest? @relation(fields: [exchangeRequestId], references: [id])
+
+  depositAddressId String?
+  depositAddress   DepositAddress? @relation(fields: [depositAddressId], references: [id])
+
+  type      TransactionType
+  status    TransactionStatus @default(CREATED)
+  direction String?
+
+  senderAddress String?
+  fromAddress   String?
+  toAddress     String?
+
+  amount          Decimal
+  confirmedAmount Decimal?
+
+  incomingCoinId String?
+  incomingCoin   Coin?   @relation("IncomingCoin", fields: [incomingCoinId], references: [id])
+
+  outgoingCoinId String?
+  outgoingCoin   Coin?   @relation("OutgoingCoin", fields: [outgoingCoinId], references: [id])
+
+  networkId String
+  network   Network @relation(fields: [networkId], references: [id])
+
+  txHash         String?   @unique
+  blockNumber    Int?
+  confirmations  Int?
+  detectedAt     DateTime?
+  processedAt    DateTime?
+  confirmedAt    DateTime?
+  failedReason   String?
+  idempotencyKey String?
+  externalId     String?
+  rawPayload     Json?
+
+  @@unique([type, idempotencyKey])
+  @@index([exchangeRequestId])
+  @@index([depositAddressId])
+  @@index([type, status])
+  @@index([networkId, createdAt])
+}
+
+model ExchangeRequest {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fromCoinId String
+  fromCoin   Coin   @relation("FromCoin", fields: [fromCoinId], references: [id])
+
+  fromNetworkId String
+  fromNetwork   Network @relation("FromNetwork", fields: [fromNetworkId], references: [id])
+
+  toCoinId String
+  toCoin   Coin   @relation("ToCoin", fields: [toCoinId], references: [id])
+
+  toNetworkId String
+  toNetwork   Network @relation("ToNetwork", fields: [toNetworkId], references: [id])
+
+  fromAmount Decimal
+  toAmount   Decimal
+
+  receivedAmount Decimal?
+  acceptedAmount Decimal?
+
+  refundedAmount  Decimal @default(0)
+  isRefunded      Boolean @default(false)
+  isPartialRefund Boolean @default(false)
+  refundReason    String?
+
+  clientWithdrawAddress String
+
+  depositAddressId String?
+  depositAddress   DepositAddress? @relation(fields: [depositAddressId], references: [id])
+
+  status ExchangeRequestStatus @default(CREATED)
+
+  estimatedRate Decimal?
+  feeAmount     Decimal  @default(0)
+
+  completedAt  DateTime?
+  failedReason String?
+
+  transactions  Transaction[]
+  subscriptions Subscription[]
+
+  @@index([status, createdAt])
+  @@index([fromCoinId, toCoinId])
+}
+
+model MasterWallet {
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coinId    String
+  networkId String
+  coin      Coin    @relation(fields: [coinId], references: [id])
+  network   Network @relation(fields: [networkId], references: [id])
+
+  xpub               String       @id @unique
+  surprise           String?
+  status             WalletStatus @default(ACTIVE)
+  currentIndex       Int          @default(0)
+  generatedAddresses Int          @default(0)
+
+  depositAddresses DepositAddress[]
+
+  @@unique([coinId, networkId])
+}
+
+model DepositAddress {
+  id String @id @default(cuid())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  address String @unique
+  index   Int
+
+  masterWalletxpub String
+  masterWallet     MasterWallet @relation(fields: [masterWalletxpub], references: [xpub])
+
+  subscriptions    Subscription[]
+  exchangeRequests ExchangeRequest[]
+  transactions     Transaction[]
+
+  @@unique([masterWalletxpub, index])
+}
+
+model GasWallet {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  networkId String
+  network   Network @relation(fields: [networkId], references: [id])
+
+  address            String        @unique
+  xpub               String        @unique
+  surprise           String?
+  type               GasWalletType @default(MASTER)
+  status             WalletStatus  @default(ACTIVE)
+  balance            Decimal       @default(0)
+  minBalance         Decimal       @default(0)
+  targetBalance      Decimal       @default(0)
+  isPrimary          Boolean       @default(false)
+  lastBalanceCheckAt DateTime?
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  level     String
+  type      String
+  message   String
+  data      Json?
+  createdBy String?
+}

@@ -1,0 +1,10 @@
+{
+    "prisma.pinToPrisma6": true,
+    "chat.tools.terminal.autoApprove": {
+        "bun": true,
+        "bunx": true,
+        "npx prisma": true,
+        "ForEach-Object": true,
+        "Test-Path": true
+    }
+}
