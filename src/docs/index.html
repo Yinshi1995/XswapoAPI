@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XSwapo — API Documentation</title>
+  <meta name="description" content="XSwapo Partner API — REST &amp; GraphQL documentation for instant crypto exchange integration." />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%238b5cf6'/%3E%3Cstop offset='100%25' stop-color='%233b82f6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='7' fill='url(%23g)'/%3E%3Cg stroke='%23fff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cline x1='9' y1='12.5' x2='23' y2='12.5'/%3E%3Cpolyline points='20,9.5 23,12.5 20,15.5'/%3E%3Cline x1='23' y1='19.5' x2='9' y2='19.5'/%3E%3Cpolyline points='12,16.5 9,19.5 12,22.5'/%3E%3C/g%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ═══════════════════════════════════════════════════════
+       XSwapo Design System — mirroring xswapo.io dark theme
+       ═══════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --app-bg:       linear-gradient(120deg, #020617, #020617 30%, #020617 55%, #0b1120 75%, #020617);
+      --glass-bg:     #0a0e1a;
+      --glass-border: rgba(255,255,255,0.06);
+      --glass-shadow: 0 8px 40px rgba(0,0,0,0.35), 0 0 80px rgba(139,92,246,0.04);
+      --glass-inner-bg:     rgba(255,255,255,0.02);
+      --glass-inner-border: rgba(255,255,255,0.04);
+      --text-primary:   #f0f0f2;
+      --text-secondary: #a1a1aa;
+      --text-tertiary:  #71717a;
+      --nav-bg:     rgba(6,9,17,0.78);
+      --nav-border: rgba(255,255,255,0.04);
+      --accent-purple: #8b5cf6;
+      --accent-blue:   #3b82f6;
+      --gradient:      linear-gradient(135deg, #8b5cf6, #3b82f6);
+      --gradient-text: linear-gradient(to right, #818cf8, #a78bfa, #c084fc, #818cf8);
+      --green:  #34d399;
+      --red:    #f87171;
+      --orange: #fbbf24;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--app-bg);
+      background-attachment: fixed;
+      color: var(--text-primary);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      min-height: 100dvh;
+    }
+
+    ::selection { background: rgba(139,92,246,0.25); }
+    a { color: inherit; text-decoration: none; }
+
+    /* ─── Dot grid background (xswapo style) ───────────── */
+    .dot-grid {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 24px 24px;
+      mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, black 30%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, black 30%, transparent 100%);
+    }
+
+    /* ─── Layout ───────────────────────────────────────── */
+    .layout {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 272px 1fr;
+      min-height: 100dvh;
+    }
+
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .main { padding: 0 20px 64px; }
+      .hero h2 { font-size: 36px; }
+    }
+
+    /* ─── Nav / Sidebar ────────────────────────────────── */
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100dvh;
+      overflow-y: auto;
+      border-right: 1px solid var(--nav-border);
+      background: var(--nav-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      padding: 0 0 32px;
+      z-index: 20;
+    }
+    .sidebar::-webkit-scrollbar { width: 3px; }
+    .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+
+    .sidebar-header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 20px;
+      height: 56px;
+      border-bottom: 1px solid var(--nav-border);
+      background: var(--nav-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: var(--gradient);
+      box-shadow: 0 4px 12px rgba(139,92,246,0.25);
+    }
+    .sidebar-logo svg { width: 16px; height: 16px; }
+    .sidebar-brand {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+    .sidebar-badge {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      background: var(--glass-inner-bg);
+      border: 1px solid var(--glass-inner-border);
+      border-radius: 100px;
+      padding: 3px 10px 3px 7px;
+    }
+    .sidebar-badge .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px rgba(52,211,153,0.5);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{ opacity:1 } 50%{ opacity:.35 } }
+
+    .sidebar-group { padding: 20px 12px 0; }
+    .sidebar-group-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      padding: 0 8px 8px;
+    }
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      transition: all .15s ease;
+      cursor: pointer;
+    }
+    .sidebar-link:hover {
+      color: var(--text-primary);
+      background: rgba(255,255,255,0.04);
+    }
+    .sidebar-link.active {
+      color: var(--text-primary);
+      background: rgba(139,92,246,0.08);
+    }
+
+    .pill {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      font-family: var(--mono);
+      letter-spacing: .5px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      min-width: 34px;
+      text-align: center;
+    }
+    .pill-get  { background: rgba(52,211,153,.1);  color: var(--green); }
+    .pill-post { background: rgba(59,130,246,.1);   color: var(--accent-blue); }
+    .pill-gql  { background: rgba(139,92,246,.1);   color: var(--accent-purple); }
+
+    /* ─── Main ─────────────────────────────────────────── */
+    .main {
+      padding: 0 56px 80px;
+      max-width: 880px;
+    }
+
+    /* ─── Hero ─────────────────────────────────────────── */
+    .hero {
+      padding: 72px 0 56px;
+      border-bottom: 1px solid var(--glass-inner-border);
+      margin-bottom: 48px;
+    }
+    .hero-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--glass-inner-bg);
+      border: 1px solid var(--glass-inner-border);
+      border-radius: 100px;
+      padding: 5px 14px 5px 9px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      margin-bottom: 24px;
+    }
+    .hero-pill .dot {
+      position: relative;
+      width: 6px; height: 6px;
+    }
+    .hero-pill .dot::before,
+    .hero-pill .dot::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: var(--green);
+    }
+    .hero-pill .dot::before {
+      animation: ping 2s cubic-bezier(0,0,.2,1) infinite;
+    }
+    @keyframes ping {
+      75%,100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    .hero h2 {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -1.8px;
+      line-height: 1.05;
+    }
+    .hero h2 .grad {
+      background: var(--gradient-text);
+      background-size: 300% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 8s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .hero-desc {
+      margin-top: 16px;
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--text-secondary);
+      max-width: 480px;
+    }
+    .hero-stats {
+      display: flex;
+      gap: 32px;
+      margin-top: 36px;
+    }
+    .hero-stats .stat-val {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .hero-stats .stat-lbl {
+      margin-top: 2px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+    }
+
+    /* ─── Base URL ──────────────────────────────────────── */
+    .base-url {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      box-shadow: var(--glass-shadow);
+      padding: 16px 22px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 48px;
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+    .base-url .label {
+      font-family: var(--font);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      white-space: nowrap;
+    }
+    .base-url code { color: var(--green); }
+
+    /* ─── Sections ─────────────────────────────────────── */
+    .section {
+      margin-bottom: 56px;
+      scroll-margin-top: 20px;
+    }
+    .section-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--glass-inner-border);
+    }
+
+    /* ─── Glass Card (Endpoint) ────────────────────────── */
+    .ep {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      box-shadow: var(--glass-shadow);
+      margin-bottom: 20px;
+      overflow: hidden;
+      scroll-margin-top: 20px;
+      transition: border-color .3s ease, box-shadow .3s ease;
+    }
+    .ep:hover {
+      border-color: rgba(139,92,246,0.12);
+      box-shadow: var(--glass-shadow), 0 20px 60px rgba(139,92,246,0.06);
+    }
+    .ep-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      cursor: pointer;
+      user-select: none;
+      transition: background .15s ease;
+    }
+    .ep-head:hover { background: rgba(255,255,255,0.015); }
+    .ep-method {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      min-width: 44px;
+      text-align: center;
+    }
+    .ep-path {
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+    .ep-path .param { color: var(--orange); }
+    .ep-desc {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--text-tertiary);
+      white-space: nowrap;
+    }
+    .ep-chevron {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      transition: transform .25s ease;
+      margin-left: 4px;
+    }
+    .ep.open .ep-chevron { transform: rotate(180deg); }
+    .ep-body-wrap {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows .35s cubic-bezier(.22,1,.36,1);
+    }
+    .ep.open .ep-body-wrap {
+      grid-template-rows: 1fr;
+    }
+    .ep-body {
+      overflow: hidden;
+      padding: 0 20px;
+      opacity: 0;
+      transition: opacity .25s ease, padding .35s cubic-bezier(.22,1,.36,1);
+    }
+    .ep.open .ep-body {
+      padding: 0 20px 20px;
+      opacity: 1;
+    }
+    .ep-body > p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 14px;
+    }
+
+    /* ─── Parameter Table ──────────────────────────────── */
+    .ptitle {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin: 18px 0 8px;
+    }
+    .ptitle:first-child { margin-top: 0; }
+    table.params {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+    }
+    table.params th {
+      text-align: left;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--glass-inner-border);
+    }
+    table.params td {
+      padding: 9px 10px;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(255,255,255,0.02);
+      vertical-align: top;
+    }
+    table.params tr:last-child td { border-bottom: none; }
+    .pname { font-family: var(--mono); font-size: 13px; color: var(--text-primary); }
+    .ptype { font-family: var(--mono); font-size: 12px; color: var(--text-tertiary); }
+    .preq  { font-size: 10px; font-weight: 600; color: var(--red); letter-spacing: .3px; }
+    .popt  { font-size: 10px; color: var(--text-tertiary); }
+
+    /* ─── Code Block ───────────────────────────────────── */
+    .code {
+      position: relative;
+      background: var(--glass-inner-bg);
+      border: 1px solid var(--glass-inner-border);
+      border-radius: var(--radius-sm);
+      margin: 10px 0 14px;
+      overflow: hidden;
+    }
+    .code-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 14px;
+      border-bottom: 1px solid var(--glass-inner-border);
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+    .code-bar .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--mono);
+      padding: 2px 8px;
+      border-radius: 5px;
+      margin-right: 8px;
+    }
+    .badge-200 { background: rgba(52,211,153,.08); color: var(--green); }
+    .badge-400 { background: rgba(251,191,36,.08); color: var(--orange); }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--glass-inner-border);
+      border-radius: 6px;
+      color: var(--text-tertiary);
+      font-size: 11px;
+      font-family: var(--font);
+      padding: 2px 10px;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+    .copy-btn:hover { color: var(--text-primary); border-color: var(--glass-border); }
+
+    .code pre {
+      padding: 14px 16px;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      line-height: 1.65;
+      color: var(--text-primary);
+      tab-size: 2;
+    }
+    .code pre::-webkit-scrollbar { height: 4px; }
+    .code pre::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 4px; }
+
+    /* Syntax tokens */
+    .k { color: #93c5fd; }         /* key */
+    .s { color: #86efac; }         /* string */
+    .n { color: #fbbf24; }         /* number */
+    .b { color: #c4b5fd; }         /* boolean */
+    .c { color: #52525b; font-style: italic; } /* comment */
+    .x { color: #71717a; }         /* null */
+
+    /* ─── Callout ──────────────────────────────────────── */
+    .callout {
+      display: flex;
+      gap: 12px;
+      background: rgba(139,92,246,0.04);
+      border: 1px solid rgba(139,92,246,0.1);
+      border-radius: var(--radius-sm);
+      padding: 14px 18px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.65;
+      margin: 14px 0;
+    }
+    .callout-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
+    /* ─── Auth Box ─────────────────────────────────────── */
+    .auth-box {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      box-shadow: var(--glass-shadow);
+      padding: 22px 26px;
+      margin-bottom: 20px;
+    }
+    .auth-box h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .auth-box p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    /* ─── Status Grid ──────────────────────────────────── */
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--glass-inner-bg);
+      border: 1px solid var(--glass-inner-border);
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: var(--mono);
+      letter-spacing: .3px;
+    }
+    .sdot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ─── Divider ──────────────────────────────────────── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--glass-inner-border);
+      margin: 48px 0;
+    }
+
+    /* ─── Footer ───────────────────────────────────────── */
+    .footer {
+      border-top: 1px solid var(--glass-inner-border);
+      padding: 28px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+    .footer a { text-decoration: underline; text-underline-offset: 2px; }
+    .footer .sep { color: rgba(255,255,255,0.1); }
+  </style>
+</head>
+<body>
+
+<div class="dot-grid"></div>
+
+<div class="layout">
+  <!-- ═══════ Sidebar ═══════ -->
+  <nav class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="color:#fff">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+        </svg>
+      </div>
+      <span class="sidebar-brand">XSwapo</span>
+      <span class="sidebar-badge"><span class="dot"></span> Live</span>
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-group-title">Overview</div>
+      <a href="#introduction" class="sidebar-link active">Introduction</a>
+      <a href="#authentication" class="sidebar-link">Authentication</a>
+      <a href="#responses" class="sidebar-link">Response Format</a>
+      <a href="#statuses" class="sidebar-link">Order Statuses</a>
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-group-title">REST API</div>
+      <a href="#get-coins" class="sidebar-link"><span class="pill pill-get">GET</span> Coins</a>
+      <a href="#get-coin" class="sidebar-link"><span class="pill pill-get">GET</span> Coin</a>
+      <a href="#get-limits" class="sidebar-link"><span class="pill pill-get">GET</span> Limits</a>
+      <a href="#get-rate" class="sidebar-link"><span class="pill pill-get">GET</span> Rate</a>
+      <a href="#post-order" class="sidebar-link"><span class="pill pill-post">POST</span> Create Order</a>
+      <a href="#get-order" class="sidebar-link"><span class="pill pill-get">GET</span> Get Order</a>
+      <a href="#get-orders" class="sidebar-link"><span class="pill pill-get">GET</span> List Orders</a>
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-group-title">GraphQL</div>
+      <a href="#graphql" class="sidebar-link"><span class="pill pill-gql">GQL</span> Overview</a>
+      <a href="#gql-queries" class="sidebar-link"><span class="pill pill-gql">Q</span> Queries</a>
+      <a href="#gql-mutations" class="sidebar-link"><span class="pill pill-gql">M</span> Mutations</a>
+    </div>
+  </nav>
+
+  <!-- ═══════ Main content ═══════ -->
+  <main class="main">
+
+    <!-- ─── Hero ───────────────────────── -->
+    <div class="hero" id="introduction">
+      <div class="hero-pill">
+        <span class="dot"></span>
+        v1.0 &middot; All systems operational
+      </div>
+      <h2>API <span class="grad">Reference.</span></h2>
+      <p class="hero-desc">
+        Integrate XSwapo's instant crypto exchange into your product.
+        RESTful &amp; GraphQL endpoints with real&#8209;time rates.
+        Zero registration required.
+      </p>
+      <div class="hero-stats">
+        <div><div class="stat-val">200+</div><div class="stat-lbl">Coins</div></div>
+        <div><div class="stat-val">&lt;5 min</div><div class="stat-lbl">Avg. Time</div></div>
+        <div><div class="stat-val">REST + GQL</div><div class="stat-lbl">Protocols</div></div>
+        <div><div class="stat-val">24 / 7</div><div class="stat-lbl">Uptime</div></div>
+      </div>
+    </div>
+
+    <!-- ─── Base URL ───────────────────── -->
+    <div class="base-url">
+      <span class="label">Base URL</span>
+      <code>https://api.xswapo.io</code>
+      <span style="color:var(--text-tertiary);font-family:var(--font);font-size:11px;margin-left:auto">REST &nbsp;·&nbsp; GraphQL at <code style="color:var(--accent-purple)">graphql.xswapo.io</code></span>
+    </div>
+
+    <!-- ═════════════ Authentication ═════════════ -->
+    <div class="section" id="authentication">
+      <div class="section-title">Authentication</div>
+      <div class="auth-box">
+        <h4>API Key (Optional)</h4>
+        <p>
+          Public endpoints (coins, rate, limits) require no authentication.
+          To track orders under your partner account, pass an API key header.
+        </p>
+      </div>
+      <div class="code">
+        <div class="code-bar">HTTP Headers <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">Content-Type</span>: application/json
+<span class="k">X-Api-Key</span>:     <span class="s">your-api-key</span></pre>
+      </div>
+      <div class="callout">
+        <span class="callout-icon">&#9432;</span>
+        <span>Contact <strong>support@xswapo.io</strong> to obtain a partner API key.</span>
+      </div>
+    </div>
+
+    <!-- ═════════════ Responses ═════════════ -->
+    <div class="section" id="responses">
+      <div class="section-title">Response Format &amp; Status Codes</div>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">
+        All REST responses return JSON with a
+        <code style="font-family:var(--mono);color:var(--text-primary)">result</code>
+        field and an HTTP-mirrored
+        <code style="font-family:var(--mono);color:var(--text-primary)">status</code> code.
+      </p>
+      <div class="code">
+        <div class="code-bar"><span class="badge badge-200">200</span> Success <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>{
+  <span class="k">"result"</span>: { ... },
+  <span class="k">"status"</span>: <span class="n">200</span>
+}</pre>
+      </div>
+      <div class="code">
+        <div class="code-bar"><span class="badge badge-400">400</span> Error <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>{
+  <span class="k">"error"</span>:  <span class="s">"Coin BTC not found or inactive"</span>,
+  <span class="k">"status"</span>: <span class="n">400</span>
+}</pre>
+      </div>
+    </div>
+
+    <!-- ═════════════ Order Statuses ═════════════ -->
+    <div class="section" id="statuses">
+      <div class="section-title">Order Statuses</div>
+      <div class="status-grid">
+        <div class="status-item"><span class="sdot" style="background:#71717a"></span> CREATED</div>
+        <div class="status-item"><span class="sdot" style="background:#fbbf24"></span> WAITING_DEPOSIT</div>
+        <div class="status-item"><span class="sdot" style="background:#3b82f6"></span> DEPOSIT_DETECTED</div>
+        <div class="status-item"><span class="sdot" style="background:#fbbf24"></span> UNDERPAID</div>
+        <div class="status-item"><span class="sdot" style="background:#fbbf24"></span> OVERPAID</div>
+        <div class="status-item"><span class="sdot" style="background:#f87171"></span> REFUND_PENDING</div>
+        <div class="status-item"><span class="sdot" style="background:#f87171"></span> PARTIALLY_REFUNDED</div>
+        <div class="status-item"><span class="sdot" style="background:#f87171"></span> REFUNDED</div>
+        <div class="status-item"><span class="sdot" style="background:#8b5cf6"></span> PROCESSING</div>
+        <div class="status-item"><span class="sdot" style="background:#34d399"></span> COMPLETED</div>
+        <div class="status-item"><span class="sdot" style="background:#52525b"></span> CANCELLED</div>
+        <div class="status-item"><span class="sdot" style="background:#f87171"></span> FAILED</div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- ════════════════ REST API ════════════════ -->
+    <div class="section" id="rest-api">
+      <div class="section-title">REST API — Endpoints</div>
+
+      <!-- GET /api/v1/coins -->
+      <div class="ep open" id="get-coins">
+        <div class="ep-head" onclick="toggle(this)">
+          <span class="ep-method pill-get">GET</span>
+          <span class="ep-path">/api/v1/coins</span>
+          <span class="ep-desc">List all available coins</span>
+          <span class="ep-chevron">&#9660;</span>
+        </div>
+        <div class="ep-body-wrap"><div class="ep-body">
+          <p>Returns all active coins with their available networks, deposit/withdraw capabilities and limits.</p>
+          <div class="code">
+            <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>curl https://api.xswapo.io/api/v1/coins</pre>
+          </div>
+          <div class="ptitle">Response</div>
+          <div class="code">
+            <div class="code-bar"><span class="badge badge-200">200</span> Success <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>{
+  <span class="k">"result"</span>: [
+    {
+      <span class="k">"id"</span>:       <span class="s">"clx..."</span>,
+      <span class="k">"code"</span>:     <span class="s">"BTC"</span>,
+      <span class="k">"name"</span>:     <span class="s">"Bitcoin"</span>,
+      <span class="k">"imageUrl"</span>: <span class="s">"https://..."</span>,
+      <span class="k">"minDepositAmount"</span>: <span class="s">"0.001"</span>,
+      <span class="k">"maxDepositAmount"</span>: <span class="s">"10"</span>,
+      <span class="k">"networks"</span>: [
+        {
+          <span class="k">"network"</span>: {
+            <span class="k">"code"</span>: <span class="s">"BTC"</span>,
+            <span class="k">"name"</span>: <span class="s">"Bitcoin"</span>,
+            <span class="k">"chain"</span>: <span class="s">"BTC"</span>,
+            <span class="k">"isDepositEnabled"</span>:  <span class="b">true</span>,
+            <span class="k">"isWithdrawEnabled"</span>: <span class="b">true</span>
+          },
+          <span class="k">"contractAddress"</span>: <span class="x">null</span>,
+          <span class="k">"decimals"</span>:        <span class="n">8</span>,
+          <span class="k">"depositEnabled"</span>:  <span class="b">true</span>,
+          <span class="k">"withdrawEnabled"</span>: <span class="b">true</span>
+        }
+      ]
+    }
+  ],
+  <span class="k">"status"</span>: <span class="n">200</span>
+}</pre>
+          </div>
+        </div>
+      </div>
+</div>
+
+      <!-- GET /api/v1/coin/:code -->
+      <div class="ep" id="get-coin">
+        <div class="ep-head" onclick="toggle(this)">
+          <span class="ep-method pill-get">GET</span>
+          <span class="ep-path">/api/v1/coin/<span class="param">:code</span></span>
+          <span class="ep-desc">Get coin by code</span>
+          <span class="ep-chevron">&#9660;</span>
+        </div>
+        <div class="ep-body-wrap"><div class="ep-body">
+          <div class="ptitle">Path Parameters</div>
+          <table class="params">
+            <tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr>
+            <tr>
+              <td><span class="pname">code</span></td>
+              <td><span class="ptype">string</span></td>
+              <td><span class="preq">required</span></td>
+              <td>Coin ticker (e.g. BTC, ETH)</td>
+            </tr>
+          </table>
+          <div class="code">
+            <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>curl https://api.xswapo.io/api/v1/coin/BTC</pre>
+          </div>
+        </div>
+      </div>
+</div>
+
+      <!-- GET /api/v1/limits -->
+      <div class="ep" id="get-limits">
+        <div class="ep-head" onclick="toggle(this)">
+          <span class="ep-method pill-get">GET</span>
+          <span class="ep-path">/api/v1/limits</span>
+          <span class="ep-desc">Exchange limits for a coin</span>
+          <span class="ep-chevron">&#9660;</span>
+        </div>
+        <div class="ep-body-wrap"><div class="ep-body">
+          <div class="ptitle">Query Parameters</div>
+          <table class="params">
+            <tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr>
+            <tr>
+              <td><span class="pname">coin</span></td>
+              <td><span class="ptype">string</span></td>
+              <td><span class="preq">required</span></td>
+              <td>Coin code</td>
+            </tr>
+          </table>
+          <div class="code">
+            <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>curl "https://api.xswapo.io/api/v1/limits?coin=BTC"</pre>
+          </div>
+          <div class="code">
+            <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>{
+  <span class="k">"result"</span>: {
+    <span class="k">"coin"</span>:      <span class="s">"BTC"</span>,
+    <span class="k">"minAmount"</span>: <span class="s">"0.001"</span>,
+    <span class="k">"maxAmount"</span>: <span class="s">"10"</span>
+  },
+  <span class="k">"status"</span>: <span class="n">200</span>
+}</pre>
+          </div>
+        </div>
+      </div>
+</div>
+
+      <!-- GET /api/v1/rate -->
+      <div class="ep" id="get-rate">
+        <div class="ep-head" onclick="toggle(this)">
+          <span class="ep-method pill-get">GET</span>
+          <span class="ep-path">/api/v1/rate</span>
+          <span class="ep-desc">Calculate exchange rate</span>
+          <span class="ep-chevron">&#9660;</span>
+        </div>
+        <div class="ep-body-wrap"><div class="ep-body">
+          <p>Calculates the live exchange rate between two coins using Binance spot prices with fee applied.</p>
+          <div class="ptitle">Query Parameters</div>
+          <table class="params">
+            <tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr>
+            <tr><td><span class="pname">from</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Source coin code</td></tr>
+            <tr><td><span class="pname">to</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Destination coin code</td></tr>
+            <tr><td><span class="pname">amount</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Amount to exchange</td></tr>
+            <tr><td><span class="pname">fromNetwork</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Source network code</td></tr>
+            <tr><td><span class="pname">toNetwork</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Destination network code</td></tr>
+          </table>
+          <div class="code">
+            <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>curl "https://api.xswapo.io/api/v1/rate?from=BTC&amp;to=ETH&amp;amount=0.1&amp;fromNetwork=BTC&amp;toNetwork=ETH"</pre>
+          </div>
+          <div class="code">
+            <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>{
+  <span class="k">"result"</span>: {
+    <span class="k">"result"</span>:    <span class="s">"4.49885"</span>,     <span class="c">// amount user receives</span>
+    <span class="k">"amount"</span>:    <span class="s">"0.1"</span>,         <span class="c">// source amount</span>
+    <span class="k">"rate"</span>:      <span class="s">"44.9935"</span>,     <span class="c">// exchange rate</span>
+    <span class="k">"feeAmount"</span>: <span class="s">"0.0001"</span>,      <span class="c">// fee charged</span>
+    <span class="k">"minAmount"</span>: <span class="s">"0.001"</span>,
+    <span class="k">"maxAmount"</span>: <span class="s">"10"</span>
+  },
+  <span class="k">"status"</span>: <span class="n">200</span>
+}</pre>
+          </div>
+        </div>
+      </div>
+</div>
+
+      <!-- POST /api/v1/order -->
+      <div class="ep" id="post-order">
+        <div class="ep-head" onclick="toggle(this)">
+          <span class="ep-method pill-post">POST</span>
+          <span class="ep-path">/api/v1/order</span>
+          <span class="ep-desc">Create exchange order</span>
+          <span class="ep-chevron">&#9660;</span>
+        </div>
+        <div class="ep-body-wrap"><div class="ep-body">
+          <p>Creates a new exchange order. Validates coins, networks, limits, calculates the rate, generates a deposit address and returns the full order.</p>
+          <div class="ptitle">Request Body</div>
+          <table class="params">
+            <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+            <tr><td><span class="pname">from</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Source coin code</td></tr>
+            <tr><td><span class="pname">fromNetwork</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Source network code</td></tr>
+            <tr><td><span class="pname">to</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Destination coin code</td></tr>
+            <tr><td><span class="pname">toNetwork</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Destination network code</td></tr>
+            <tr><td><span class="pname">amount</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Amount to exchange</td></tr>
+            <tr><td><span class="pname">address</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Recipient wallet address</td></tr>
+          </table>
+          <div class="code">
+            <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>curl -X POST https://api.xswapo.io/api/v1/order \
+  -H "Content-Type: application/json" \
+  -H "X-Api-Key: your-api-key" \
+  -d '{
+    "from": "BTC",
+    "fromNetwork": "BTC",
+    "to": "ETH",
+    "toNetwork": "ETH",
+    "amount": "0.1",
+    "address": "0xAbCdEf..."
+  }'</pre>
+          </div>
+          <div class="code">
+            <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>{
+  <span class="k">"result"</span>: {
+    <span class="k">"id"</span>:                    <span class="s">"clxyz..."</span>,
+    <span class="k">"status"</span>:                <span class="s">"CREATED"</span>,
+    <span class="k">"fromCoin"</span>:              { <span class="k">"code"</span>: <span class="s">"BTC"</span>, <span class="k">"name"</span>: <span class="s">"Bitcoin"</span> },
+    <span class="k">"toCoin"</span>:                { <span class="k">"code"</span>: <span class="s">"ETH"</span>, <span class="k">"name"</span>: <span class="s">"Ethereum"</span> },
+    <span class="k">"fromAmount"</span>:            <span class="s">"0.1"</span>,
+    <span class="k">"toAmount"</span>:              <span class="s">"4.49885"</span>,
+    <span class="k">"estimatedRate"</span>:         <span class="s">"44.9935"</span>,
+    <span class="k">"feeAmount"</span>:             <span class="s">"0.0001"</span>,
+    <span class="k">"clientWithdrawAddress"</span>: <span class="s">"0xAbCdEf..."</span>,
+    <span class="k">"depositAddress"</span>:        { <span class="k">"address"</span>: <span class="s">"bc1q..."</span> },
+    <span class="k">"createdAt"</span>:             <span class="s">"2026-03-28T12:00:00.000Z"</span>
+  },
+  <span class="k">"status"</span>: <span class="n">200</span>
+}</pre>
+          </div>
+        </div>
+      </div>
+</div>
+
+      <!-- GET /api/v1/order/:id -->
+      <div class="ep" id="get-order">
+        <div class="ep-head" onclick="toggle(this)">
+          <span class="ep-method pill-get">GET</span>
+          <span class="ep-path">/api/v1/order/<span class="param">:id</span></span>
+          <span class="ep-desc">Get order by ID</span>
+          <span class="ep-chevron">&#9660;</span>
+        </div>
+        <div class="ep-body-wrap"><div class="ep-body">
+          <div class="ptitle">Path Parameters</div>
+          <table class="params">
+            <tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr>
+            <tr>
+              <td><span class="pname">id</span></td>
+              <td><span class="ptype">string</span></td>
+              <td><span class="preq">required</span></td>
+              <td>Exchange request ID</td>
+            </tr>
+          </table>
+          <div class="code">
+            <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>curl https://api.xswapo.io/api/v1/order/clxyz...</pre>
+          </div>
+          <p>Returns the full order object including transactions, deposit address, coins and networks.</p>
+        </div>
+      </div>
+</div>
+
+      <!-- GET /api/v1/orders -->
+      <div class="ep" id="get-orders">
+        <div class="ep-head" onclick="toggle(this)">
+          <span class="ep-method pill-get">GET</span>
+          <span class="ep-path">/api/v1/orders</span>
+          <span class="ep-desc">List orders (paginated)</span>
+          <span class="ep-chevron">&#9660;</span>
+        </div>
+        <div class="ep-body-wrap"><div class="ep-body">
+          <div class="ptitle">Query Parameters</div>
+          <table class="params">
+            <tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr>
+            <tr><td><span class="pname">page</span></td><td><span class="ptype">integer</span></td><td><span class="popt">optional</span></td><td>Page number (default: 1)</td></tr>
+            <tr><td><span class="pname">pageSize</span></td><td><span class="ptype">integer</span></td><td><span class="popt">optional</span></td><td>Items per page (default: 20, max: 100)</td></tr>
+            <tr><td><span class="pname">status</span></td><td><span class="ptype">string</span></td><td><span class="popt">optional</span></td><td>Filter by order status</td></tr>
+          </table>
+          <div class="code">
+            <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>curl "https://api.xswapo.io/api/v1/orders?page=1&amp;pageSize=10&amp;status=COMPLETED"</pre>
+          </div>
+          <div class="code">
+            <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>{
+  <span class="k">"result"</span>: [ ... ],
+  <span class="k">"pagination"</span>: {
+    <span class="k">"currentPage"</span>: <span class="n">1</span>,
+    <span class="k">"totalPages"</span>:  <span class="n">5</span>,
+    <span class="k">"totalCount"</span>:  <span class="n">94</span>,
+    <span class="k">"hasNextPage"</span>: <span class="b">true</span>
+  },
+  <span class="k">"status"</span>: <span class="n">200</span>
+}</pre>
+          </div>
+        </div>
+      </div>
+</div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- ════════════════ GraphQL ════════════════ -->
+    <div class="section" id="graphql">
+      <div class="section-title">GraphQL API</div>
+      <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px">
+        The same data is available via a GraphQL endpoint. Send queries to:
+      </p>
+      <div class="base-url" style="margin-bottom:20px">
+        <span class="label">Endpoint</span>
+        <code>POST https://graphql.xswapo.io</code>
+      </div>
+      <div class="callout">
+        <span class="callout-icon">&#128302;</span>
+        <span>An interactive <strong>GraphQL Playground</strong> is available at <code style="font-family:var(--mono)">/graphql</code> in the browser.</span>
+      </div>
+    </div>
+
+    <!-- GQL Queries -->
+    <div class="ep" id="gql-queries">
+      <div class="ep-head" onclick="toggle(this)">
+        <span class="ep-method pill-gql" style="min-width:60px">QUERY</span>
+        <span class="ep-path">coins &middot; coin &middot; limits &middot; rate &middot; exchangeRequest(s)</span>
+        <span class="ep-chevron">&#9660;</span>
+      </div>
+      <div class="ep-body-wrap"><div class="ep-body">
+        <div class="code">
+          <div class="code-bar">All coins <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">query</span> {
+  coins {
+    code
+    name
+    imageUrl
+    minDepositAmount
+    maxDepositAmount
+    networks {
+      network { code name chain isDepositEnabled }
+      decimals
+      depositEnabled
+      withdrawEnabled
+    }
+  }
+}</pre>
+        </div>
+        <div class="code">
+          <div class="code-bar">Limits <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">query</span> {
+  limits(coinCode: <span class="s">"BTC"</span>) {
+    coinCode
+    minAmount
+    maxAmount
+  }
+}</pre>
+        </div>
+        <div class="code">
+          <div class="code-bar">Rate <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">query</span> {
+  rate(input: {
+    from: <span class="s">"BTC"</span>
+    to: <span class="s">"ETH"</span>
+    amount: <span class="s">"0.1"</span>
+    fromNetwork: <span class="s">"BTC"</span>
+    toNetwork: <span class="s">"ETH"</span>
+  }) {
+    result
+    amount
+    rate
+    feeAmount
+    minAmount
+    maxAmount
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+</div>
+
+    <!-- GQL Mutations -->
+    <div class="ep" id="gql-mutations">
+      <div class="ep-head" onclick="toggle(this)">
+        <span class="ep-method" style="background:rgba(59,130,246,.1);color:var(--accent-blue);min-width:60px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.5px;padding:4px 10px;border-radius:6px;text-align:center">MUTATION</span>
+        <span class="ep-path">createExchangeRequest</span>
+        <span class="ep-chevron">&#9660;</span>
+      </div>
+      <div class="ep-body-wrap"><div class="ep-body">
+        <div class="code">
+          <div class="code-bar">Create order <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">mutation</span> {
+  createExchangeRequest(input: {
+    from: <span class="s">"BTC"</span>
+    fromNetwork: <span class="s">"BTC"</span>
+    to: <span class="s">"ETH"</span>
+    toNetwork: <span class="s">"ETH"</span>
+    amount: <span class="s">"0.1"</span>
+    address: <span class="s">"0xAbCdEf..."</span>
+  }) {
+    id
+    status
+    fromAmount
+    toAmount
+    estimatedRate
+    feeAmount
+    depositAddress { address }
+    createdAt
+    transactions {
+      id
+      type
+      status
+      amount
+      txHash
+    }
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+</div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>&#169; 2026 Xswapo. All rights reserved.</span>
+      <span class="sep">&middot;</span>
+      <a href="https://xswapo.io/terms-of-service">Terms</a>
+      <span class="sep">&middot;</span>
+      <a href="https://xswapo.io/privacy-policy">Privacy</a>
+      <span class="sep">&middot;</span>
+      <a href="https://xswapo.io/aml-policy">AML</a>
+    </div>
+  </main>
+</div>
+
+<script>
+  function toggle(el) {
+    const ep = el.closest('.ep');
+    ep.classList.toggle('open');
+  }
+
+  function cp(btn) {
+    const pre = btn.closest('.code').querySelector('pre');
+    navigator.clipboard.writeText(pre.textContent).then(() => {
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1400);
+    });
+  }
+
+  // Active sidebar tracking
+  const links = document.querySelectorAll('.sidebar-link');
+  const targets = [];
+  links.forEach(a => {
+    const h = a.getAttribute('href');
+    if (h && h.startsWith('#')) {
+      const el = document.getElementById(h.slice(1));
+      if (el) targets.push({ el, a });
+    }
+  });
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const m = targets.find(t => t.el === e.target);
+        if (m) m.a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-15% 0px -80% 0px' });
+  targets.forEach(t => obs.observe(t.el));
+</script>
+
+</body>
+</html>
+

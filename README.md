@@ -1,5 +1,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Bun-1.1-black?logo=bun&logoColor=white" alt="Bun" />
+  <img src="https://img.shields.io/badge/REST-API-22c55e?style=flat" alt="REST" />
   <img src="https://img.shields.io/badge/GraphQL-Yoga-E535AB?logo=graphql&logoColor=white" alt="GraphQL Yoga" />
   <img src="https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white" alt="Prisma" />
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
@@ -8,8 +9,9 @@
 
 # ⚡ XSwapo API
 
-> Client-facing GraphQL API для криптообменного сервиса XSwapo.
+> REST + GraphQL API для криптообменного сервиса XSwapo.
 > Предоставляет клиентам доступ к списку монет, расчёту курсов, лимитам и созданию заявок на обмен.
+> Включает встроенную интерактивную документацию в стиле xswapo.io.
 
 ---
 
@@ -19,10 +21,11 @@
 - [Архитектура](#-архитектура)
 - [Быстрый старт](#-быстрый-старт)
 - [Переменные окружения](#-переменные-окружения)
+- [REST API](#-rest-api)
 - [GraphQL API](#-graphql-api)
   - [Queries](#queries)
   - [Mutations](#mutations)
-- [Примеры запросов](#-примеры-запросов)
+- [Интерактивная документация](#-интерактивная-документация)
 - [Структура проекта](#-структура-проекта)
 - [Бизнес-логика](#-бизнес-логика)
 
@@ -43,19 +46,24 @@
 ## 🏗 Архитектура
 
 ```
-┌─────────────┐     GraphQL      ┌──────────────┐     Prisma     ┌────────────┐
-│   Клиент    │ ──────────────── │  XSwapo API  │ ─────────────  │ PostgreSQL │
-│  (фронт /   │   /graphql       │  (Bun +      │                │            │
-│   мобайл)   │                  │   Yoga)      │                │  (shared   │
-└─────────────┘                  └──────┬───────┘                │   с admin) │
-                                        │                        └────────────┘
-                                        │ fetch
-                                        ▼
-                                 ┌──────────────┐
-                                 │  Binance API │
+┌─────────────┐                  ┌──────────────┐     Prisma     ┌────────────┐
+│   Клиент    │  REST /api/v1/*  │              │ ─────────────  │ PostgreSQL │
+│  (фронт /   │ ──────────────── │  XSwapo API  │                │            │
+│   мобайл /  │  GraphQL         │  (Bun)       │                │  (shared   │
+│   партнёр)  │ ──────────────── │              │                │   с admin) │
+└─────────────┘  /graphql        └──────┬───────┘                └────────────┘
+                                        │
+      ┌──────────┐                      │ fetch
+      │  /docs   │ ◄── Interactive      ▼
+      │  / (root)│     API docs  ┌──────────────┐
+      └──────────┘               │  Binance API │
                                  │  (spot rate) │
                                  └──────────────┘
 ```
+
+- **REST API** — `/api/v1/*` — классический JSON API
+- **GraphQL** — `/graphql` — SDL-first, с Playground
+- **Docs** — `/` и `/docs` — встроенная интерактивная документация
 
 API и Admin-панель работают с **одной и той же PostgreSQL базой** через идентичную Prisma-схему.
 
@@ -90,7 +98,10 @@ bunx prisma generate
 bun run index.ts
 ```
 
-Сервер стартует на `http://localhost:4000/graphql` с интерактивным GraphQL Playground.
+Сервер стартует на `http://localhost:4000` с тремя эндпоинтами:
+- **Docs**: `http://localhost:4000/docs`
+- **REST**: `http://localhost:4000/api/v1/coins`
+- **GraphQL**: `http://localhost:4000/graphql`
 
 ---
 
@@ -105,6 +116,80 @@ bun run index.ts
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/xswapo"
 PORT=4000
+```
+
+---
+
+## 🌐 REST API
+
+### Base URL
+
+```
+http://localhost:4000/api/v1
+```
+
+Заголовки:
+```
+Content-Type: application/json
+X-Api-Key: <your-api-key>       # опциональный
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|:--|:--|:--|
+| `GET` | `/api/v1/coins` | Список всех активных монет с сетями |
+| `GET` | `/api/v1/coin/:code` | Монета по коду (BTC, ETH...) |
+| `GET` | `/api/v1/limits?coin=BTC` | Лимиты на обмен |
+| `GET` | `/api/v1/rate?from=BTC&to=ETH&amount=0.1&fromNetwork=BTC&toNetwork=ETH` | Расчёт курса |
+| `POST` | `/api/v1/order` | Создать заявку на обмен |
+| `GET` | `/api/v1/order/:id` | Заявка по ID |
+| `GET` | `/api/v1/orders?page=1&pageSize=20&status=COMPLETED` | Список заявок (пагинация) |
+
+### Примеры
+
+#### Получить список монет
+
+```bash
+curl https://api.xswapo.io/api/v1/coins
+```
+
+#### Расчёт курса
+
+```bash
+curl "https://api.xswapo.io/api/v1/rate?from=BTC&to=ETH&amount=0.1&fromNetwork=BTC&toNetwork=ETH"
+```
+
+#### Создать заявку
+
+```bash
+curl -X POST https://api.xswapo.io/api/v1/order \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "BTC",
+    "fromNetwork": "BTC",
+    "to": "ETH",
+    "toNetwork": "ETH",
+    "amount": "0.1",
+    "address": "0xAbCdEf..."
+  }'
+```
+
+### Формат ответа
+
+```json
+{
+  "result": { ... },
+  "status": 200
+}
+```
+
+Ошибки:
+```json
+{
+  "error": "Coin BTC not found or inactive",
+  "status": 400
+}
 ```
 
 ---
@@ -310,11 +395,23 @@ mutation {
 
 ---
 
+## � Интерактивная документация
+
+Откройте `http://localhost:4000/docs` в браузере — встроенная документация в стиле xswapo.io:
+
+- Тёмная premium-тема
+- Все REST и GraphQL эндпоинты с примерами
+- Интерактивные блоки (сворачиваемые, с копированием)
+- Статусы заявок, формат ответов
+- Sidebar-навигация с IntersectionObserver
+
+---
+
 ## 📁 Структура проекта
 
 ```
 api/
-├── index.ts                          # Точка входа — Bun HTTP + GraphQL Yoga
+├── index.ts                          # Точка входа — роутинг REST / GraphQL / Docs
 ├── package.json
 ├── tsconfig.json
 │
@@ -327,6 +424,12 @@ api/
     │
     ├── lib/
     │   └── prisma.ts                 # Prisma Client singleton
+    │
+    ├── docs/
+    │   └── serve.ts                  # Интерактивная HTML документация
+    │
+    ├── rest/
+    │   └── routes.ts                 # REST API v1 — все эндпоинты
     │
     └── resolvers/
         ├── index.ts                  # Объединение резолверов + кастомные скаляры
