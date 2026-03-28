@@ -1,9 +1,11 @@
 import { createYoga, createSchema } from "graphql-yoga"
+import { fetchRequestHandler } from "@trpc/server/adapters/fetch"
 import { typeDefs } from "./src/schema"
 import { resolvers } from "./src/resolvers"
 import { prisma } from "./src/lib/prisma"
 import { handleRestRequest } from "./src/rest/routes"
 import { serveDocsPage } from "./src/docs/serve"
+import { appRouter } from "./src/trpc/router"
 import type { GraphQLContext } from "./src/context"
 
 const yoga = createYoga<{ request: Request }, GraphQLContext>({
@@ -38,6 +40,19 @@ const server = Bun.serve({
       })
     }
 
+    // ── tRPC ──
+    if (url.pathname.startsWith("/trpc")) {
+      return fetchRequestHandler({
+        endpoint: "/trpc",
+        req,
+        router: appRouter,
+        createContext: () => ({
+          prisma,
+          apiKey: req.headers.get("x-api-key") ?? req.headers.get("api-key"),
+        }),
+      })
+    }
+
     // ── GraphQL ──
     return yoga.fetch(req)
   },
@@ -45,5 +60,6 @@ const server = Bun.serve({
 
 console.log(`⚡ XSwapo API running at http://localhost:${server.port}`)
 console.log(`   REST:    http://localhost:${server.port}/api/v1/coins`)
+console.log(`   tRPC:    http://localhost:${server.port}/trpc`)
 console.log(`   GraphQL: http://localhost:${server.port}/graphql`)
 console.log(`   Docs:    http://localhost:${server.port}/docs`)

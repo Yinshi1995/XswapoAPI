@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>XSwapo — API Documentation</title>
-  <meta name="description" content="XSwapo Partner API — REST &amp; GraphQL documentation for instant crypto exchange integration." />
+  <meta name="description" content="XSwapo Partner API — REST, GraphQL &amp; tRPC documentation for instant crypto exchange integration." />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%238b5cf6'/%3E%3Cstop offset='100%25' stop-color='%233b82f6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='7' fill='url(%23g)'/%3E%3Cg stroke='%23fff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' fill='none'%3E%3Cline x1='9' y1='12.5' x2='23' y2='12.5'/%3E%3Cpolyline points='20,9.5 23,12.5 20,15.5'/%3E%3Cline x1='23' y1='19.5' x2='9' y2='19.5'/%3E%3Cpolyline points='12,16.5 9,19.5 12,22.5'/%3E%3C/g%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -194,6 +194,7 @@
     .pill-get  { background: rgba(52,211,153,.1);  color: var(--green); }
     .pill-post { background: rgba(59,130,246,.1);   color: var(--accent-blue); }
     .pill-gql  { background: rgba(139,92,246,.1);   color: var(--accent-purple); }
+    .pill-trpc { background: rgba(56,166,220,.1);   color: #38a6dc; }
 
     /* ─── Main ─────────────────────────────────────────── */
     .main {
@@ -628,6 +629,13 @@
       <a href="#gql-queries" class="sidebar-link"><span class="pill pill-gql">Q</span> Queries</a>
       <a href="#gql-mutations" class="sidebar-link"><span class="pill pill-gql">M</span> Mutations</a>
     </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-group-title">tRPC</div>
+      <a href="#trpc" class="sidebar-link"><span class="pill pill-trpc">tRPC</span> Overview</a>
+      <a href="#trpc-queries" class="sidebar-link"><span class="pill pill-trpc">Q</span> Queries</a>
+      <a href="#trpc-mutation" class="sidebar-link"><span class="pill pill-trpc">M</span> Mutation</a>
+    </div>
   </nav>
 
   <!-- ═══════ Main content ═══════ -->
@@ -642,13 +650,13 @@
       <h2>API <span class="grad">Reference.</span></h2>
       <p class="hero-desc">
         Integrate XSwapo's instant crypto exchange into your product.
-        RESTful &amp; GraphQL endpoints with real&#8209;time rates.
+        RESTful, GraphQL &amp; tRPC endpoints with real&#8209;time rates.
         Zero registration required.
       </p>
       <div class="hero-stats">
         <div><div class="stat-val">200+</div><div class="stat-lbl">Coins</div></div>
         <div><div class="stat-val">&lt;5 min</div><div class="stat-lbl">Avg. Time</div></div>
-        <div><div class="stat-val">REST + GQL</div><div class="stat-lbl">Protocols</div></div>
+        <div><div class="stat-val">REST + GQL + tRPC</div><div class="stat-lbl">Protocols</div></div>
         <div><div class="stat-val">24 / 7</div><div class="stat-lbl">Uptime</div></div>
       </div>
     </div>
@@ -677,7 +685,7 @@
       </div>
       <div class="callout">
         <span class="callout-icon">&#9432;</span>
-        <span>Contact <strong>support@xswapo.io</strong> to obtain a partner API key.</span>
+        <span>Contact <strong>xwaposupport@proton.me</strong> to obtain a partner API key.</span>
       </div>
     </div>
 
@@ -1122,6 +1130,177 @@
       txHash
     }
   }
+}</pre>
+        </div>
+      </div>
+    </div>
+</div>
+
+    <hr class="divider" />
+
+    <!-- ════════════════ tRPC ════════════════ -->
+    <div class="section" id="trpc">
+      <div class="section-title">tRPC API</div>
+      <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px">
+        End-to-end typesafe API for TypeScript clients. Import the <code style="font-family:var(--mono);color:var(--text-primary)">AppRouter</code> type and get full autocompletion.
+      </p>
+      <div class="base-url" style="margin-bottom:20px">
+        <span class="label">Endpoint</span>
+        <code>https://api.xswapo.io/trpc</code>
+      </div>
+      <div class="callout">
+        <span class="callout-icon">&#9889;</span>
+        <span>Install <code style="font-family:var(--mono)">@trpc/client</code> and import <code style="font-family:var(--mono)">AppRouter</code> from the server for full type safety.</span>
+      </div>
+      <div class="code">
+        <div class="code-bar">Client Setup (TypeScript) <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">import</span> { createTRPCClient, httpBatchLink } <span class="k">from</span> <span class="s">'@trpc/client'</span>
+<span class="k">import type</span> { AppRouter } <span class="k">from</span> <span class="s">'./src/trpc/router'</span>
+
+<span class="k">const</span> trpc = createTRPCClient&lt;AppRouter&gt;({
+  links: [
+    httpBatchLink({
+      url: <span class="s">'https://api.xswapo.io/trpc'</span>,
+      headers: {
+        <span class="s">'x-api-key'</span>: <span class="s">'your-api-key'</span>,  <span class="c">// optional</span>
+      },
+    }),
+  ],
+})</pre>
+      </div>
+    </div>
+
+    <!-- tRPC Queries -->
+    <div class="ep" id="trpc-queries">
+      <div class="ep-head" onclick="toggle(this)">
+        <span class="ep-method pill-trpc" style="min-width:60px">QUERY</span>
+        <span class="ep-path">coins.list · coins.byCode · coins.limits · exchange.rate · order.byId · order.list</span>
+        <span class="ep-chevron">&#9660;</span>
+      </div>
+      <div class="ep-body-wrap"><div class="ep-body">
+        <p>All queries use <code style="font-family:var(--mono)">trpc['procedure'].query(input?)</code> syntax.</p>
+
+        <div class="ptitle">coins.list — All active coins</div>
+        <div class="code">
+          <div class="code-bar">TypeScript <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">const</span> coins = <span class="k">await</span> trpc[<span class="s">'coins.list'</span>].query()</pre>
+        </div>
+
+        <div class="ptitle">coins.byCode — Coin by ticker</div>
+        <div class="code">
+          <div class="code-bar">TypeScript <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">const</span> btc = <span class="k">await</span> trpc[<span class="s">'coins.byCode'</span>].query({ code: <span class="s">'BTC'</span> })</pre>
+        </div>
+        <table class="params">
+          <tr><th>Param</th><th>Type</th><th></th><th>Description</th></tr>
+          <tr><td><span class="pname">code</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Coin ticker (BTC, ETH…)</td></tr>
+        </table>
+
+        <div class="ptitle">coins.limits — Exchange limits</div>
+        <div class="code">
+          <div class="code-bar">TypeScript <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">const</span> limits = <span class="k">await</span> trpc[<span class="s">'coins.limits'</span>].query({ coin: <span class="s">'BTC'</span> })
+<span class="c">// → { coin: "BTC", minAmount: "0.001", maxAmount: "10" }</span></pre>
+        </div>
+        <table class="params">
+          <tr><th>Param</th><th>Type</th><th></th><th>Description</th></tr>
+          <tr><td><span class="pname">coin</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Coin code</td></tr>
+        </table>
+
+        <div class="ptitle">exchange.rate — Calculate rate</div>
+        <div class="code">
+          <div class="code-bar">TypeScript <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">const</span> rate = <span class="k">await</span> trpc[<span class="s">'exchange.rate'</span>].query({
+  from: <span class="s">'BTC'</span>,
+  to: <span class="s">'ETH'</span>,
+  amount: <span class="s">'0.1'</span>,
+  fromNetwork: <span class="s">'BTC'</span>,
+  toNetwork: <span class="s">'ETH'</span>,
+})
+<span class="c">// → { result, amount, rate, feeAmount, minAmount, maxAmount }</span></pre>
+        </div>
+        <table class="params">
+          <tr><th>Param</th><th>Type</th><th></th><th>Description</th></tr>
+          <tr><td><span class="pname">from</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Source coin code</td></tr>
+          <tr><td><span class="pname">to</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Destination coin code</td></tr>
+          <tr><td><span class="pname">amount</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Amount to exchange</td></tr>
+          <tr><td><span class="pname">fromNetwork</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Source network code</td></tr>
+          <tr><td><span class="pname">toNetwork</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Destination network code</td></tr>
+        </table>
+
+        <div class="ptitle">order.byId — Get order by ID</div>
+        <div class="code">
+          <div class="code-bar">TypeScript <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">const</span> order = <span class="k">await</span> trpc[<span class="s">'order.byId'</span>].query({ id: <span class="s">'clxyz...'</span> })</pre>
+        </div>
+        <table class="params">
+          <tr><th>Param</th><th>Type</th><th></th><th>Description</th></tr>
+          <tr><td><span class="pname">id</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Exchange request ID</td></tr>
+        </table>
+
+        <div class="ptitle">order.list — List orders (paginated)</div>
+        <div class="code">
+          <div class="code-bar">TypeScript <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">const</span> orders = <span class="k">await</span> trpc[<span class="s">'order.list'</span>].query({
+  page: <span class="n">1</span>,
+  pageSize: <span class="n">20</span>,
+  status: <span class="s">'COMPLETED'</span>,
+})
+<span class="c">// → { result: [...], pagination: { currentPage, totalPages, totalCount, hasNextPage } }</span></pre>
+        </div>
+        <table class="params">
+          <tr><th>Param</th><th>Type</th><th></th><th>Description</th></tr>
+          <tr><td><span class="pname">page</span></td><td><span class="ptype">number</span></td><td><span class="popt">optional</span></td><td>Page number (default: 1)</td></tr>
+          <tr><td><span class="pname">pageSize</span></td><td><span class="ptype">number</span></td><td><span class="popt">optional</span></td><td>Items per page (default: 20, max: 100)</td></tr>
+          <tr><td><span class="pname">status</span></td><td><span class="ptype">string</span></td><td><span class="popt">optional</span></td><td>Filter by order status</td></tr>
+        </table>
+      </div>
+    </div>
+</div>
+
+    <!-- tRPC Mutation -->
+    <div class="ep" id="trpc-mutation">
+      <div class="ep-head" onclick="toggle(this)">
+        <span class="ep-method" style="background:rgba(56,166,220,.1);color:#38a6dc;min-width:60px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.5px;padding:4px 10px;border-radius:6px;text-align:center">MUTATE</span>
+        <span class="ep-path">order.create</span>
+        <span class="ep-chevron">&#9660;</span>
+      </div>
+      <div class="ep-body-wrap"><div class="ep-body">
+        <p>Creates a new exchange order. Validates coins, networks, limits, calculates the rate, generates a deposit address and returns the full order.</p>
+        <div class="code">
+          <div class="code-bar">TypeScript <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre><span class="k">const</span> order = <span class="k">await</span> trpc[<span class="s">'order.create'</span>].mutate({
+  from: <span class="s">'BTC'</span>,
+  fromNetwork: <span class="s">'BTC'</span>,
+  to: <span class="s">'ETH'</span>,
+  toNetwork: <span class="s">'ETH'</span>,
+  amount: <span class="s">'0.1'</span>,
+  address: <span class="s">'0xAbCdEf...'</span>,
+})</pre>
+        </div>
+        <table class="params">
+          <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+          <tr><td><span class="pname">from</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Source coin code</td></tr>
+          <tr><td><span class="pname">fromNetwork</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Source network code</td></tr>
+          <tr><td><span class="pname">to</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Destination coin code</td></tr>
+          <tr><td><span class="pname">toNetwork</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Destination network code</td></tr>
+          <tr><td><span class="pname">amount</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Amount to exchange</td></tr>
+          <tr><td><span class="pname">address</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Recipient wallet address</td></tr>
+        </table>
+        <div class="code">
+          <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
+<pre>{
+  <span class="k">"id"</span>:                    <span class="s">"clxyz..."</span>,
+  <span class="k">"status"</span>:                <span class="s">"CREATED"</span>,
+  <span class="k">"fromCoin"</span>:              { <span class="k">"code"</span>: <span class="s">"BTC"</span>, <span class="k">"name"</span>: <span class="s">"Bitcoin"</span> },
+  <span class="k">"toCoin"</span>:                { <span class="k">"code"</span>: <span class="s">"ETH"</span>, <span class="k">"name"</span>: <span class="s">"Ethereum"</span> },
+  <span class="k">"fromAmount"</span>:            <span class="s">"0.1"</span>,
+  <span class="k">"toAmount"</span>:              <span class="s">"4.49885"</span>,
+  <span class="k">"estimatedRate"</span>:         <span class="s">"44.9935"</span>,
+  <span class="k">"feeAmount"</span>:             <span class="s">"0.0001"</span>,
+  <span class="k">"clientWithdrawAddress"</span>: <span class="s">"0xAbCdEf..."</span>,
+  <span class="k">"depositAddress"</span>:        { <span class="k">"address"</span>: <span class="s">"bc1q..."</span> },
+  <span class="k">"createdAt"</span>:             <span class="s">"2026-03-28T12:00:00.000Z"</span>
 }</pre>
         </div>
       </div>

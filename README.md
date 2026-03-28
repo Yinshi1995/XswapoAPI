@@ -2,6 +2,7 @@
   <img src="https://img.shields.io/badge/Bun-1.1-black?logo=bun&logoColor=white" alt="Bun" />
   <img src="https://img.shields.io/badge/REST-API-22c55e?style=flat" alt="REST" />
   <img src="https://img.shields.io/badge/GraphQL-Yoga-E535AB?logo=graphql&logoColor=white" alt="GraphQL Yoga" />
+  <img src="https://img.shields.io/badge/tRPC-11-398CCB?logo=trpc&logoColor=white" alt="tRPC" />
   <img src="https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white" alt="Prisma" />
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white" alt="PostgreSQL" />
@@ -9,7 +10,7 @@
 
 # ⚡ XSwapo API
 
-> REST + GraphQL API для криптообменного сервиса XSwapo.
+> REST + GraphQL + tRPC API для криптообменного сервиса XSwapo.
 > Предоставляет клиентам доступ к списку монет, расчёту курсов, лимитам и созданию заявок на обмен.
 > Включает встроенную интерактивную документацию в стиле xswapo.io.
 
@@ -25,6 +26,9 @@
 - [GraphQL API](#-graphql-api)
   - [Queries](#queries)
   - [Mutations](#mutations)
+- [tRPC API](#-trpc-api)
+  - [Queries (tRPC)](#queries-trpc)
+  - [Mutations (tRPC)](#mutations-trpc)
 - [Интерактивная документация](#-интерактивная-документация)
 - [Структура проекта](#-структура-проекта)
 - [Бизнес-логика](#-бизнес-логика)
@@ -37,6 +41,8 @@
 |:--|:--|
 | [Bun](https://bun.sh) | JavaScript/TypeScript runtime + HTTP сервер |
 | [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server) | GraphQL сервер (SDL-first) |
+| [tRPC](https://trpc.io) | End-to-end typesafe API |
+| [Zod](https://zod.dev) | Валидация входных данных (tRPC) |
 | [Prisma 6](https://www.prisma.io) | ORM для PostgreSQL |
 | [TypeScript 5](https://www.typescriptlang.org) | Типизация |
 | [Binance API](https://binance-docs.github.io/apidocs/) | Источник обменных курсов |
@@ -51,7 +57,9 @@
 │  (фронт /   │ ──────────────── │  XSwapo API  │                │            │
 │   мобайл /  │  GraphQL         │  (Bun)       │                │  (shared   │
 │   партнёр)  │ ──────────────── │              │                │   с admin) │
-└─────────────┘  /graphql        └──────┬───────┘                └────────────┘
+│             │  tRPC /trpc      │              │                │            │
+│             │ ──────────────── │              │                │            │
+└─────────────┘                  └──────┬───────┘                └────────────┘
                                         │
       ┌──────────┐                      │ fetch
       │  /docs   │ ◄── Interactive      ▼
@@ -63,6 +71,7 @@
 
 - **REST API** — `/api/v1/*` — классический JSON API
 - **GraphQL** — `/graphql` — SDL-first, с Playground
+- **tRPC** — `/trpc` — end-to-end typesafe API для TypeScript-клиентов
 - **Docs** — `/` и `/docs` — встроенная интерактивная документация
 
 API и Admin-панель работают с **одной и той же PostgreSQL базой** через идентичную Prisma-схему.
@@ -98,9 +107,10 @@ bunx prisma generate
 bun run index.ts
 ```
 
-Сервер стартует на `http://localhost:4000` с тремя эндпоинтами:
+Сервер стартует на `http://localhost:4000` с четырьмя эндпоинтами:
 - **Docs**: `http://localhost:4000/docs`
 - **REST**: `http://localhost:4000/api/v1/coins`
+- **tRPC**: `http://localhost:4000/trpc`
 - **GraphQL**: `http://localhost:4000/graphql`
 
 ---
@@ -194,7 +204,152 @@ curl -X POST https://api.xswapo.io/api/v1/order \
 
 ---
 
-## 📡 GraphQL API
+## � tRPC API
+
+### Endpoint
+
+```
+http://localhost:4000/trpc
+```
+
+tRPC даёт полную типобезопасность между сервером и TypeScript-клиентом. Используйте `@trpc/client` для вызова процедур с автодополнением типов.
+
+### Подключение клиента
+
+```typescript
+import { createTRPCClient, httpBatchLink } from '@trpc/client'
+import type { AppRouter } from './src/trpc/router'
+
+const trpc = createTRPCClient<AppRouter>({
+  links: [
+    httpBatchLink({
+      url: 'https://api.xswapo.io/trpc',
+      headers: {
+        'x-api-key': 'your-api-key',  // опционально
+      },
+    }),
+  ],
+})
+```
+
+---
+
+### Queries (tRPC)
+
+#### `coins.list` — Список всех активных монет
+
+```typescript
+const coins = await trpc['coins.list'].query()
+```
+
+---
+
+#### `coins.byCode` — Получить монету по коду
+
+```typescript
+const btc = await trpc['coins.byCode'].query({ code: 'BTC' })
+```
+
+| Параметр | Тип | Описание |
+|:--|:--|:--|
+| `code` | `string` | Код монеты (BTC, ETH...) |
+
+---
+
+#### `coins.limits` — Лимиты на обмен
+
+```typescript
+const limits = await trpc['coins.limits'].query({ coin: 'BTC' })
+// → { coin: "BTC", minAmount: "0.001", maxAmount: "10" }
+```
+
+| Параметр | Тип | Описание |
+|:--|:--|:--|
+| `coin` | `string` | Код монеты |
+
+---
+
+#### `exchange.rate` — Расчёт курса обмена
+
+```typescript
+const rate = await trpc['exchange.rate'].query({
+  from: 'BTC',
+  to: 'ETH',
+  amount: '0.1',
+  fromNetwork: 'BTC',
+  toNetwork: 'ETH',
+})
+// → { result, amount, rate, feeAmount, minAmount, maxAmount }
+```
+
+| Параметр | Тип | Описание |
+|:--|:--|:--|
+| `from` | `string` | Исходная монета |
+| `to` | `string` | Целевая монета |
+| `amount` | `string` | Сумма обмена |
+| `fromNetwork` | `string` | Сеть отправки |
+| `toNetwork` | `string` | Сеть получения |
+
+---
+
+#### `order.byId` — Получить заявку по ID
+
+```typescript
+const order = await trpc['order.byId'].query({ id: 'clxyz...' })
+```
+
+| Параметр | Тип | Описание |
+|:--|:--|:--|
+| `id` | `string` | ID заявки |
+
+---
+
+#### `order.list` — Список заявок (пагинация)
+
+```typescript
+const orders = await trpc['order.list'].query({
+  page: 1,
+  pageSize: 20,
+  status: 'COMPLETED',
+})
+// → { result: [...], pagination: { currentPage, totalPages, totalCount, hasNextPage } }
+```
+
+| Параметр | Тип | Описание |
+|:--|:--|:--|
+| `page` | `number` | Номер страницы (по умолчанию: 1) |
+| `pageSize` | `number` | Элементов на странице (1–100, по умолчанию: 20) |
+| `status` | `string?` | Фильтр по статусу |
+
+---
+
+### Mutations (tRPC)
+
+#### `order.create` — Создать заявку на обмен
+
+```typescript
+const order = await trpc['order.create'].mutate({
+  from: 'BTC',
+  fromNetwork: 'BTC',
+  to: 'ETH',
+  toNetwork: 'ETH',
+  amount: '0.1',
+  address: '0xAbCdEf...',
+})
+```
+
+| Параметр | Тип | Описание |
+|:--|:--|:--|
+| `from` | `string` | Исходная монета |
+| `fromNetwork` | `string` | Сеть отправки |
+| `to` | `string` | Целевая монета |
+| `toNetwork` | `string` | Сеть получения |
+| `amount` | `string` | Сумма обмена |
+| `address` | `string` | Адрес кошелька получателя |
+
+---
+
+## �📡 GraphQL API
 
 ### Endpoint
 
@@ -430,6 +585,9 @@ api/
     │
     ├── rest/
     │   └── routes.ts                 # REST API v1 — все эндпоинты
+    │
+    ├── trpc/
+    │   └── router.ts                 # tRPC-роутер — процедуры с Zod-валидацией
     │
     └── resolvers/
         ├── index.ts                  # Объединение резолверов + кастомные скаляры
