@@ -685,10 +685,9 @@
     </div>
 
     <!-- ─── Base URL ───────────────────── -->
-    <div class="base-url">
+    <div class="base-url" style="margin-bottom:48px">
       <span class="label">Base URL</span>
       <code>https://api.xswapo.io</code>
-      <span style="color:var(--text-tertiary);font-family:var(--font);font-size:11px;margin-left:auto">REST &nbsp;·&nbsp; GraphQL at <code style="color:var(--accent-purple)">graphql.xswapo.io</code></span>
     </div>
 
     <!-- ═════════════ Authentication ═════════════ -->
@@ -766,7 +765,7 @@
       <div class="ep open" id="get-coins">
         <div class="ep-head" onclick="toggle(this)">
           <span class="ep-method pill-get">GET</span>
-          <span class="ep-path">/api/v1/coins</span>
+          <span class="ep-path">/coins</span>
           <span class="ep-desc">List all available coins</span>
           <span class="ep-chevron">&#9660;</span>
         </div>
@@ -775,7 +774,7 @@
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
 <pre>curl -H "X-Api-Key: xswp_your-api-key" \
-  https://api.xswapo.io/api/v1/coins</pre>
+  https://api.xswapo.io/coins</pre>
           </div>
           <div class="ptitle">Response</div>
           <div class="code">
@@ -808,7 +807,7 @@
       <div class="ep" id="get-coin">
         <div class="ep-head" onclick="toggle(this)">
           <span class="ep-method pill-get">GET</span>
-          <span class="ep-path">/api/v1/coin/<span class="param">:code</span></span>
+          <span class="ep-path">/coin/<span class="param">:code</span></span>
           <span class="ep-desc">Get coin by code</span>
           <span class="ep-chevron">&#9660;</span>
         </div>
@@ -826,7 +825,7 @@
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
 <pre>curl -H "X-Api-Key: xswp_your-api-key" \
-  https://api.xswapo.io/api/v1/coin/BTC</pre>
+  https://api.xswapo.io/coin/BTC</pre>
           </div>
         </div>
       </div>
@@ -836,7 +835,7 @@
       <div class="ep" id="get-limits">
         <div class="ep-head" onclick="toggle(this)">
           <span class="ep-method pill-get">GET</span>
-          <span class="ep-path">/api/v1/limits</span>
+          <span class="ep-path">/limits</span>
           <span class="ep-desc">Exchange limits for a coin</span>
           <span class="ep-chevron">&#9660;</span>
         </div>
@@ -854,7 +853,7 @@
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
 <pre>curl -H "X-Api-Key: xswp_your-api-key" \
-  "https://api.xswapo.io/api/v1/limits?coin=BTC"</pre>
+  "https://api.xswapo.io/limits?coin=BTC"</pre>
           </div>
           <div class="code">
             <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
@@ -875,7 +874,7 @@
       <div class="ep" id="get-rate">
         <div class="ep-head" onclick="toggle(this)">
           <span class="ep-method pill-get">GET</span>
-          <span class="ep-path">/api/v1/rate</span>
+          <span class="ep-path">/rate</span>
           <span class="ep-desc">Calculate exchange rate</span>
           <span class="ep-chevron">&#9660;</span>
         </div>
@@ -893,7 +892,7 @@
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
 <pre>curl -H "X-Api-Key: xswp_your-api-key" \
-  "https://api.xswapo.io/api/v1/rate?from=BTC&amp;to=ETH&amp;amount=0.1&amp;fromNetwork=BTC_MAINNET&amp;toNetwork=ETH_MAINNET"</pre>
+  "https://api.xswapo.io/rate?from=BTC&amp;to=ETH&amp;amount=0.1&amp;fromNetwork=BTC_MAINNET&amp;toNetwork=ETH_MAINNET"</pre>
           </div>
           <div class="code">
             <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
@@ -917,7 +916,7 @@
       <div class="ep" id="post-order">
         <div class="ep-head" onclick="toggle(this)">
           <span class="ep-method pill-post">POST</span>
-          <span class="ep-path">/api/v1/order</span>
+          <span class="ep-path">/order</span>
           <span class="ep-desc">Create exchange order</span>
           <span class="ep-chevron">&#9660;</span>
         </div>
@@ -935,7 +934,7 @@
           </table>
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
-<pre>curl -X POST https://api.xswapo.io/api/v1/order \
+<pre>curl -X POST https://api.xswapo.io/order \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: xswp_your-api-key" \
   -d '{
@@ -981,7 +980,7 @@
       <div class="ep" id="get-order">
         <div class="ep-head" onclick="toggle(this)">
           <span class="ep-method pill-get">GET</span>
-          <span class="ep-path">/api/v1/order/<span class="param">:id</span></span>
+          <span class="ep-path">/order/<span class="param">:id</span></span>
           <span class="ep-desc">Get order by ID</span>
           <span class="ep-chevron">&#9660;</span>
         </div>
@@ -999,7 +998,7 @@
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
 <pre>curl -H "X-Api-Key: xswp_your-api-key" \
-  https://api.xswapo.io/api/v1/order/bravel-somikt</pre>
+  https://api.xswapo.io/order/bravel-somikt</pre>
           </div>
           <p>Returns the full order object including transactions and deposit address.</p>
         </div>
@@ -1010,7 +1009,7 @@
       <div class="ep" id="get-orders">
         <div class="ep-head" onclick="toggle(this)">
           <span class="ep-method pill-get">GET</span>
-          <span class="ep-path">/api/v1/orders</span>
+          <span class="ep-path">/orders</span>
           <span class="ep-desc">List orders (paginated)</span>
           <span class="ep-chevron">&#9660;</span>
         </div>
@@ -1025,7 +1024,7 @@
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
 <pre>curl -H "X-Api-Key: xswp_your-api-key" \
-  "https://api.xswapo.io/api/v1/orders?page=1&amp;pageSize=10&amp;status=COMPLETED"</pre>
+  "https://api.xswapo.io/orders?page=1&amp;pageSize=10&amp;status=COMPLETED"</pre>
           </div>
           <div class="code">
             <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
@@ -1055,11 +1054,11 @@
       </p>
       <div class="base-url" style="margin-bottom:20px">
         <span class="label">Endpoint</span>
-        <code>POST https://graphql.xswapo.io</code>
+        <code>POST https://gql.xswapo.io</code>
       </div>
       <div class="callout">
         <span class="callout-icon">&#128302;</span>
-        <span>An interactive <strong>GraphQL Playground</strong> is available at <code style="font-family:var(--mono)">/graphql</code> in the browser.</span>
+        <span>An interactive <strong>GraphQL Playground</strong> is available at <a href="https://gql.xswapo.io" style="color:var(--accent-purple);text-decoration:underline;text-underline-offset:2px">gql.xswapo.io</a> in the browser.</span>
       </div>
     </div>
 
@@ -1172,7 +1171,7 @@
       </p>
       <div class="base-url" style="margin-bottom:20px">
         <span class="label">Endpoint</span>
-        <code>https://api.xswapo.io/trpc</code>
+        <code>https://trpc.xswapo.io</code>
       </div>
       <div class="callout">
         <span class="callout-icon">&#9889;</span>
@@ -1186,7 +1185,7 @@
 <span class="k">const</span> trpc = createTRPCClient&lt;AppRouter&gt;({
   links: [
     httpBatchLink({
-      url: <span class="s">'https://api.xswapo.io/trpc'</span>,
+      url: <span class="s">'https://trpc.xswapo.io'</span>,
       headers: {
         <span class="s">'x-api-key'</span>: <span class="s">'xswp_your-api-key'</span>,
       },
