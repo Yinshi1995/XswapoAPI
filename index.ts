@@ -63,3 +63,11 @@ console.log(`   REST:    http://localhost:${server.port}/api/v1/coins`)
 console.log(`   tRPC:    http://localhost:${server.port}/trpc`)
 console.log(`   GraphQL: http://localhost:${server.port}/graphql`)
 console.log(`   Docs:    http://localhost:${server.port}/docs`)
+
+// Graceful shutdown — release Prisma connection pool
+const shutdown = async () => {
+  await prisma.$disconnect()
+  process.exit(0)
+}
+process.on("SIGINT", shutdown)
+process.on("SIGTERM", shutdown)
