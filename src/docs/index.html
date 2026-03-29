@@ -674,7 +674,7 @@
       <p class="hero-desc">
         Integrate XSwapo's instant crypto exchange into your product.
         RESTful, GraphQL &amp; tRPC endpoints with real&#8209;time rates.
-        Zero registration required.
+        API key required for all requests.
       </p>
       <div class="hero-stats">
         <div><div class="stat-val">200+</div><div class="stat-lbl">Coins</div></div>
@@ -695,20 +695,20 @@
     <div class="section" id="authentication">
       <div class="section-title">Authentication</div>
       <div class="auth-box">
-        <h4>API Key (Optional)</h4>
+        <h4>API Key (Required)</h4>
         <p>
-          Public endpoints (coins, rate, limits) require no authentication.
-          To track orders under your partner account, pass an API key header.
+          All endpoints require a valid API key. Pass it via the <code style="font-family:var(--mono)">X-Api-Key</code> header.
+          Requests without a valid key will receive a <code style="font-family:var(--mono)">401</code> error.
         </p>
       </div>
       <div class="code">
         <div class="code-bar">HTTP Headers <button class="copy-btn" onclick="cp(this)">Copy</button></div>
 <pre><span class="k">Content-Type</span>: application/json
-<span class="k">X-Api-Key</span>:     <span class="s">your-api-key</span></pre>
+<span class="k">X-Api-Key</span>:     <span class="s">xswp_your-api-key</span></pre>
       </div>
       <div class="callout">
         <span class="callout-icon">&#9432;</span>
-        <span>Contact <strong>xwaposupport@proton.me</strong> to obtain a partner API key.</span>
+        <span>Contact <strong>xwaposupport@proton.me</strong> to obtain an API key.</span>
       </div>
     </div>
 
@@ -774,7 +774,8 @@
           <p>Returns all active coins with their available networks, deposit/withdraw capabilities and limits.</p>
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
-<pre>curl https://api.xswapo.io/api/v1/coins</pre>
+<pre>curl -H "X-Api-Key: xswp_your-api-key" \
+  https://api.xswapo.io/api/v1/coins</pre>
           </div>
           <div class="ptitle">Response</div>
           <div class="code">
@@ -782,23 +783,14 @@
 <pre>{
   <span class="k">"result"</span>: [
     {
-      <span class="k">"id"</span>:       <span class="s">"clx..."</span>,
       <span class="k">"code"</span>:     <span class="s">"BTC"</span>,
       <span class="k">"name"</span>:     <span class="s">"Bitcoin"</span>,
-      <span class="k">"imageUrl"</span>: <span class="s">"https://..."</span>,
       <span class="k">"minDepositAmount"</span>: <span class="s">"0.001"</span>,
       <span class="k">"maxDepositAmount"</span>: <span class="s">"10"</span>,
       <span class="k">"networks"</span>: [
         {
-          <span class="k">"network"</span>: {
-            <span class="k">"code"</span>: <span class="s">"BTC"</span>,
-            <span class="k">"name"</span>: <span class="s">"Bitcoin"</span>,
-            <span class="k">"chain"</span>: <span class="s">"BTC"</span>,
-            <span class="k">"isDepositEnabled"</span>:  <span class="b">true</span>,
-            <span class="k">"isWithdrawEnabled"</span>: <span class="b">true</span>
-          },
-          <span class="k">"contractAddress"</span>: <span class="x">null</span>,
-          <span class="k">"decimals"</span>:        <span class="n">8</span>,
+          <span class="k">"code"</span>: <span class="s">"BTC_MAINNET"</span>,
+          <span class="k">"name"</span>: <span class="s">"Bitcoin Mainnet"</span>,
           <span class="k">"depositEnabled"</span>:  <span class="b">true</span>,
           <span class="k">"withdrawEnabled"</span>: <span class="b">true</span>
         }
@@ -833,7 +825,8 @@
           </table>
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
-<pre>curl https://api.xswapo.io/api/v1/coin/BTC</pre>
+<pre>curl -H "X-Api-Key: xswp_your-api-key" \
+  https://api.xswapo.io/api/v1/coin/BTC</pre>
           </div>
         </div>
       </div>
@@ -860,7 +853,8 @@
           </table>
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
-<pre>curl "https://api.xswapo.io/api/v1/limits?coin=BTC"</pre>
+<pre>curl -H "X-Api-Key: xswp_your-api-key" \
+  "https://api.xswapo.io/api/v1/limits?coin=BTC"</pre>
           </div>
           <div class="code">
             <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
@@ -898,7 +892,8 @@
           </table>
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
-<pre>curl "https://api.xswapo.io/api/v1/rate?from=BTC&amp;to=ETH&amp;amount=0.1&amp;fromNetwork=BTC&amp;toNetwork=ETH"</pre>
+<pre>curl -H "X-Api-Key: xswp_your-api-key" \
+  "https://api.xswapo.io/api/v1/rate?from=BTC&amp;to=ETH&amp;amount=0.1&amp;fromNetwork=BTC_MAINNET&amp;toNetwork=ETH_MAINNET"</pre>
           </div>
           <div class="code">
             <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
@@ -942,12 +937,12 @@
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
 <pre>curl -X POST https://api.xswapo.io/api/v1/order \
   -H "Content-Type: application/json" \
-  -H "X-Api-Key: your-api-key" \
+  -H "X-Api-Key: xswp_your-api-key" \
   -d '{
     "from": "BTC",
-    "fromNetwork": "BTC",
+    "fromNetwork": "BTC_MAINNET",
     "to": "ETH",
-    "toNetwork": "ETH",
+    "toNetwork": "ETH_MAINNET",
     "amount": "0.1",
     "address": "0xAbCdEf..."
   }'</pre>
@@ -956,17 +951,24 @@
             <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
 <pre>{
   <span class="k">"result"</span>: {
-    <span class="k">"id"</span>:                    <span class="s">"clxyz..."</span>,
-    <span class="k">"status"</span>:                <span class="s">"CREATED"</span>,
-    <span class="k">"fromCoin"</span>:              { <span class="k">"code"</span>: <span class="s">"BTC"</span>, <span class="k">"name"</span>: <span class="s">"Bitcoin"</span> },
-    <span class="k">"toCoin"</span>:                { <span class="k">"code"</span>: <span class="s">"ETH"</span>, <span class="k">"name"</span>: <span class="s">"Ethereum"</span> },
-    <span class="k">"fromAmount"</span>:            <span class="s">"0.1"</span>,
-    <span class="k">"toAmount"</span>:              <span class="s">"4.49885"</span>,
-    <span class="k">"estimatedRate"</span>:         <span class="s">"44.9935"</span>,
-    <span class="k">"feeAmount"</span>:             <span class="s">"0.0001"</span>,
-    <span class="k">"clientWithdrawAddress"</span>: <span class="s">"0xAbCdEf..."</span>,
-    <span class="k">"depositAddress"</span>:        { <span class="k">"address"</span>: <span class="s">"bc1q..."</span> },
-    <span class="k">"createdAt"</span>:             <span class="s">"2026-03-28T12:00:00.000Z"</span>
+    <span class="k">"id"</span>:              <span class="s">"bravel-somikt"</span>,
+    <span class="k">"status"</span>:          <span class="s">"CREATED"</span>,
+    <span class="k">"createdAt"</span>:       <span class="s">"2026-03-28T12:00:00.000Z"</span>,
+    <span class="k">"from"</span>: {
+      <span class="k">"coin"</span>:    <span class="s">"BTC"</span>,
+      <span class="k">"network"</span>: <span class="s">"BTC_MAINNET"</span>,
+      <span class="k">"amount"</span>:  <span class="s">"0.1"</span>
+    },
+    <span class="k">"to"</span>: {
+      <span class="k">"coin"</span>:    <span class="s">"ETH"</span>,
+      <span class="k">"network"</span>: <span class="s">"ETH_MAINNET"</span>,
+      <span class="k">"amount"</span>:  <span class="s">"4.49885"</span>
+    },
+    <span class="k">"rate"</span>:            <span class="s">"44.9935"</span>,
+    <span class="k">"fee"</span>:             <span class="s">"0.0001"</span>,
+    <span class="k">"depositAddress"</span>:  <span class="s">"bc1q..."</span>,
+    <span class="k">"withdrawAddress"</span>: <span class="s">"0xAbCdEf..."</span>,
+    <span class="k">"transactions"</span>:    []
   },
   <span class="k">"status"</span>: <span class="n">200</span>
 }</pre>
@@ -991,14 +993,15 @@
               <td><span class="pname">id</span></td>
               <td><span class="ptype">string</span></td>
               <td><span class="preq">required</span></td>
-              <td>Exchange request ID</td>
+              <td>Order ID (e.g. <code style="font-family:var(--mono)">bravel-somikt</code>)</td>
             </tr>
           </table>
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
-<pre>curl https://api.xswapo.io/api/v1/order/clxyz...</pre>
+<pre>curl -H "X-Api-Key: xswp_your-api-key" \
+  https://api.xswapo.io/api/v1/order/bravel-somikt</pre>
           </div>
-          <p>Returns the full order object including transactions, deposit address, coins and networks.</p>
+          <p>Returns the full order object including transactions and deposit address.</p>
         </div>
       </div>
 </div>
@@ -1021,7 +1024,8 @@
           </table>
           <div class="code">
             <div class="code-bar">cURL <button class="copy-btn" onclick="cp(this)">Copy</button></div>
-<pre>curl "https://api.xswapo.io/api/v1/orders?page=1&amp;pageSize=10&amp;status=COMPLETED"</pre>
+<pre>curl -H "X-Api-Key: xswp_your-api-key" \
+  "https://api.xswapo.io/api/v1/orders?page=1&amp;pageSize=10&amp;status=COMPLETED"</pre>
           </div>
           <div class="code">
             <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
@@ -1073,12 +1077,11 @@
   coins {
     code
     name
-    imageUrl
     minDepositAmount
     maxDepositAmount
     networks {
-      network { code name chain isDepositEnabled }
-      decimals
+      code
+      name
       depositEnabled
       withdrawEnabled
     }
@@ -1102,8 +1105,8 @@
     from: <span class="s">"BTC"</span>
     to: <span class="s">"ETH"</span>
     amount: <span class="s">"0.1"</span>
-    fromNetwork: <span class="s">"BTC"</span>
-    toNetwork: <span class="s">"ETH"</span>
+    fromNetwork: <span class="s">"BTC_MAINNET"</span>
+    toNetwork: <span class="s">"ETH_MAINNET"</span>
   }) {
     result
     amount
@@ -1131,22 +1134,22 @@
 <pre><span class="k">mutation</span> {
   createExchangeRequest(input: {
     from: <span class="s">"BTC"</span>
-    fromNetwork: <span class="s">"BTC"</span>
+    fromNetwork: <span class="s">"BTC_MAINNET"</span>
     to: <span class="s">"ETH"</span>
-    toNetwork: <span class="s">"ETH"</span>
+    toNetwork: <span class="s">"ETH_MAINNET"</span>
     amount: <span class="s">"0.1"</span>
     address: <span class="s">"0xAbCdEf..."</span>
   }) {
     id
     status
-    fromAmount
-    toAmount
-    estimatedRate
-    feeAmount
-    depositAddress { address }
     createdAt
+    from { coin network amount }
+    to { coin network amount }
+    rate
+    fee
+    depositAddress
+    withdrawAddress
     transactions {
-      id
       type
       status
       amount
@@ -1185,7 +1188,7 @@
     httpBatchLink({
       url: <span class="s">'https://api.xswapo.io/trpc'</span>,
       headers: {
-        <span class="s">'x-api-key'</span>: <span class="s">'your-api-key'</span>,  <span class="c">// optional</span>
+        <span class="s">'x-api-key'</span>: <span class="s">'xswp_your-api-key'</span>,
       },
     }),
   ],
@@ -1254,11 +1257,11 @@
         <div class="ptitle">order.byId — Get order by ID</div>
         <div class="code">
           <div class="code-bar">TypeScript <button class="copy-btn" onclick="cp(this)">Copy</button></div>
-<pre><span class="k">const</span> order = <span class="k">await</span> trpc[<span class="s">'order.byId'</span>].query({ id: <span class="s">'clxyz...'</span> })</pre>
+<pre><span class="k">const</span> order = <span class="k">await</span> trpc[<span class="s">'order.byId'</span>].query({ id: <span class="s">'bravel-somikt'</span> })</pre>
         </div>
         <table class="params">
           <tr><th>Param</th><th>Type</th><th></th><th>Description</th></tr>
-          <tr><td><span class="pname">id</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Exchange request ID</td></tr>
+          <tr><td><span class="pname">id</span></td><td><span class="ptype">string</span></td><td><span class="preq">required</span></td><td>Order ID</td></tr>
         </table>
 
         <div class="ptitle">order.list — List orders (paginated)</div>
@@ -1294,9 +1297,9 @@
           <div class="code-bar">TypeScript <button class="copy-btn" onclick="cp(this)">Copy</button></div>
 <pre><span class="k">const</span> order = <span class="k">await</span> trpc[<span class="s">'order.create'</span>].mutate({
   from: <span class="s">'BTC'</span>,
-  fromNetwork: <span class="s">'BTC'</span>,
+  fromNetwork: <span class="s">'BTC_MAINNET'</span>,
   to: <span class="s">'ETH'</span>,
-  toNetwork: <span class="s">'ETH'</span>,
+  toNetwork: <span class="s">'ETH_MAINNET'</span>,
   amount: <span class="s">'0.1'</span>,
   address: <span class="s">'0xAbCdEf...'</span>,
 })</pre>
@@ -1313,17 +1316,24 @@
         <div class="code">
           <div class="code-bar"><span class="badge badge-200">200</span> Response <button class="copy-btn" onclick="cp(this)">Copy</button></div>
 <pre>{
-  <span class="k">"id"</span>:                    <span class="s">"clxyz..."</span>,
-  <span class="k">"status"</span>:                <span class="s">"CREATED"</span>,
-  <span class="k">"fromCoin"</span>:              { <span class="k">"code"</span>: <span class="s">"BTC"</span>, <span class="k">"name"</span>: <span class="s">"Bitcoin"</span> },
-  <span class="k">"toCoin"</span>:                { <span class="k">"code"</span>: <span class="s">"ETH"</span>, <span class="k">"name"</span>: <span class="s">"Ethereum"</span> },
-  <span class="k">"fromAmount"</span>:            <span class="s">"0.1"</span>,
-  <span class="k">"toAmount"</span>:              <span class="s">"4.49885"</span>,
-  <span class="k">"estimatedRate"</span>:         <span class="s">"44.9935"</span>,
-  <span class="k">"feeAmount"</span>:             <span class="s">"0.0001"</span>,
-  <span class="k">"clientWithdrawAddress"</span>: <span class="s">"0xAbCdEf..."</span>,
-  <span class="k">"depositAddress"</span>:        { <span class="k">"address"</span>: <span class="s">"bc1q..."</span> },
-  <span class="k">"createdAt"</span>:             <span class="s">"2026-03-28T12:00:00.000Z"</span>
+  <span class="k">"id"</span>:              <span class="s">"bravel-somikt"</span>,
+  <span class="k">"status"</span>:          <span class="s">"CREATED"</span>,
+  <span class="k">"createdAt"</span>:       <span class="s">"2026-03-28T12:00:00.000Z"</span>,
+  <span class="k">"from"</span>: {
+    <span class="k">"coin"</span>:    <span class="s">"BTC"</span>,
+    <span class="k">"network"</span>: <span class="s">"BTC_MAINNET"</span>,
+    <span class="k">"amount"</span>:  <span class="s">"0.1"</span>
+  },
+  <span class="k">"to"</span>: {
+    <span class="k">"coin"</span>:    <span class="s">"ETH"</span>,
+    <span class="k">"network"</span>: <span class="s">"ETH_MAINNET"</span>,
+    <span class="k">"amount"</span>:  <span class="s">"4.49885"</span>
+  },
+  <span class="k">"rate"</span>:            <span class="s">"44.9935"</span>,
+  <span class="k">"fee"</span>:             <span class="s">"0.0001"</span>,
+  <span class="k">"depositAddress"</span>:  <span class="s">"bc1q..."</span>,
+  <span class="k">"withdrawAddress"</span>: <span class="s">"0xAbCdEf..."</span>,
+  <span class="k">"transactions"</span>:    []
 }</pre>
         </div>
       </div>

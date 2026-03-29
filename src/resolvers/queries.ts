@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client"
 type Decimal = Prisma.Decimal
 import type { GraphQLContext } from "../context"
 import { resolveNetwork } from "../lib/resolveNetwork"
+import { validateApiKey } from "../lib/auth"
 
 export const queryResolvers = {
   Query: {
@@ -10,6 +11,7 @@ export const queryResolvers = {
      * Mirrors Swapuz GET /api/home/v1/coins
      */
     coins: async (_parent: unknown, _args: unknown, ctx: GraphQLContext) => {
+      if (!(await validateApiKey(ctx.prisma, ctx.apiKey))) throw new Error("Invalid or missing API key")
       return ctx.prisma.coin.findMany({
         where: { status: "ACTIVE" },
         include: {
@@ -26,6 +28,7 @@ export const queryResolvers = {
      * Get a single coin by code.
      */
     coin: async (_parent: unknown, args: { code: string }, ctx: GraphQLContext) => {
+      if (!(await validateApiKey(ctx.prisma, ctx.apiKey))) throw new Error("Invalid or missing API key")
       return ctx.prisma.coin.findFirst({
         where: { code: args.code, status: "ACTIVE" },
         include: {
@@ -42,6 +45,7 @@ export const queryResolvers = {
      * Mirrors Swapuz GET /api/home/getLimits?coin=BTC
      */
     limits: async (_parent: unknown, args: { coinCode: string }, ctx: GraphQLContext) => {
+      if (!(await validateApiKey(ctx.prisma, ctx.apiKey))) throw new Error("Invalid or missing API key")
       const coin = await ctx.prisma.coin.findUnique({
         where: { code: args.coinCode },
       })
@@ -68,6 +72,7 @@ export const queryResolvers = {
       args: { input: { from: string; to: string; amount: string; fromNetwork: string; toNetwork: string } },
       ctx: GraphQLContext,
     ) => {
+      if (!(await validateApiKey(ctx.prisma, ctx.apiKey))) throw new Error("Invalid or missing API key")
       const { from, to, amount, fromNetwork, toNetwork } = args.input
 
       // Validate coins exist and are active
@@ -138,8 +143,9 @@ export const queryResolvers = {
      * Mirrors Swapuz GET /api/order/uid/{uid}
      */
     exchangeRequest: async (_parent: unknown, args: { id: string }, ctx: GraphQLContext) => {
-      return ctx.prisma.exchangeRequest.findUnique({
-        where: { id: args.id },
+      if (!(await validateApiKey(ctx.prisma, ctx.apiKey))) throw new Error("Invalid or missing API key")
+      return ctx.prisma.exchangeRequest.findFirst({
+        where: { OR: [{ orderId: args.id }, { id: args.id }] },
         include: {
           fromCoin: {
             include: { mappings: { where: { isActive: true }, include: { network: true } } },
@@ -166,6 +172,7 @@ export const queryResolvers = {
       args: { page?: number; pageSize?: number; status?: string },
       ctx: GraphQLContext,
     ) => {
+      if (!(await validateApiKey(ctx.prisma, ctx.apiKey))) throw new Error("Invalid or missing API key")
       const page = Math.max(1, args.page ?? 1)
       const pageSize = Math.min(100, Math.max(1, args.pageSize ?? 20))
       const skip = (page - 1) * pageSize
@@ -214,11 +221,9 @@ export const queryResolvers = {
 
   Coin: {
     networks: (coin: any) => {
-      // coin.mappings is already included from the query
       return (coin.mappings ?? []).map((m: any) => ({
-        network: m.network,
-        contractAddress: m.contractAddress,
-        decimals: m.decimals,
+        code: m.network.code,
+        name: m.network.name,
         depositEnabled: m.depositEnabled,
         withdrawEnabled: m.withdrawEnabled,
       }))
@@ -226,8 +231,28 @@ export const queryResolvers = {
   },
 
   ExchangeRequest: {
-    depositAddress: (er: any) => er.depositAddress ?? null,
-    transactions: (er: any) => er.transactions ?? [],
+    id: (er: any) => er.orderId ?? er.id,
+    from: (er: any) => ({
+      coin: er.fromCoin?.code,
+      network: er.fromNetwork?.code,
+      amount: er.fromAmount,
+    }),
+    to: (er: any) => ({
+      coin: er.toCoin?.code,
+      network: er.toNetwork?.code,
+      amount: er.toAmount,
+    }),
+    rate: (er: any) => er.estimatedRate,
+    fee: (er: any) => er.feeAmount,
+    depositAddress: (er: any) => er.depositAddress?.address ?? null,
+    withdrawAddress: (er: any) => er.clientWithdrawAddress,
+    transactions: (er: any) =>
+      (er.transactions ?? []).map((tx: any) => ({
+        type: tx.type,
+        status: tx.status,
+        amount: tx.amount,
+        txHash: tx.txHash ?? null,
+      })),
   },
 }
 

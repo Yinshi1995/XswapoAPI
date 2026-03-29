@@ -2,6 +2,8 @@ import { Prisma } from "@prisma/client"
 type Decimal = Prisma.Decimal
 import type { GraphQLContext } from "../context"
 import { resolveNetwork } from "../lib/resolveNetwork"
+import { validateApiKey } from "../lib/auth"
+import { generateOrderId } from "../lib/generateOrderId"
 
 export const mutationResolvers = {
   Mutation: {
@@ -38,6 +40,8 @@ export const mutationResolvers = {
       },
       ctx: GraphQLContext,
     ) => {
+      if (!(await validateApiKey(ctx.prisma, ctx.apiKey))) throw new Error("Invalid or missing API key")
+
       const { from, fromNetwork, to, toNetwork, amount, address } = args.input
 
       // ── 1. Validate coins ──
@@ -146,6 +150,7 @@ export const mutationResolvers = {
         // Create the exchange request
         const er = await tx.exchangeRequest.create({
           data: {
+            orderId: generateOrderId(),
             fromCoinId: fromCoin.id,
             fromNetworkId: fromNet.id,
             toCoinId: toCoin.id,

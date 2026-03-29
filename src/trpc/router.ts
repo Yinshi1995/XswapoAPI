@@ -1,7 +1,9 @@
-import { initTRPC } from "@trpc/server"
+import { initTRPC, TRPCError } from "@trpc/server"
 import { z } from "zod"
 import { Prisma, PrismaClient } from "@prisma/client"
 import { resolveNetwork } from "../lib/resolveNetwork"
+import { validateApiKey } from "../lib/auth"
+import { generateOrderId } from "../lib/generateOrderId"
 
 type Decimal = Prisma.Decimal
 
@@ -14,29 +16,26 @@ export interface TRPCContext {
 
 const t = initTRPC.context<TRPCContext>().create()
 
+const authMiddleware = t.middleware(async ({ ctx, next }) => {
+  if (!(await validateApiKey(ctx.prisma, ctx.apiKey))) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid or missing API key" })
+  }
+  return next({ ctx })
+})
+
+const protectedProcedure = t.procedure.use(authMiddleware)
+
 // ─── Shared helpers ─────────────────────────────────────────
 
 function serializeCoin(coin: any) {
   return {
-    id: coin.id,
     code: coin.code,
     name: coin.name,
-    imageUrl: coin.imageUrl,
     minDepositAmount: coin.minDepositAmount?.toString(),
     maxDepositAmount: coin.maxDepositAmount?.toString() ?? null,
     networks: (coin.mappings ?? []).map((m: any) => ({
-      network: {
-        id: m.network.id,
-        code: m.network.code,
-        name: m.network.name,
-        chain: m.network.chain,
-        isDepositEnabled: m.network.isDepositEnabled,
-        isWithdrawEnabled: m.network.isWithdrawEnabled,
-        explorerUrl: m.network.explorerUrl,
-        imageUrl: m.network.imageUrl,
-      },
-      contractAddress: m.contractAddress,
-      decimals: m.decimals,
+      code: m.network.code,
+      name: m.network.name,
       depositEnabled: m.depositEnabled,
       withdrawEnabled: m.withdrawEnabled,
     })),
@@ -45,38 +44,28 @@ function serializeCoin(coin: any) {
 
 function serializeExchangeRequest(er: any) {
   return {
-    id: er.id,
-    createdAt: er.createdAt,
-    updatedAt: er.updatedAt,
+    id: er.orderId ?? er.id,
     status: er.status,
-    fromCoin: er.fromCoin ? serializeCoin(er.fromCoin) : undefined,
-    fromNetwork: er.fromNetwork
-      ? { id: er.fromNetwork.id, code: er.fromNetwork.code, name: er.fromNetwork.name, chain: er.fromNetwork.chain }
-      : undefined,
-    toCoin: er.toCoin ? serializeCoin(er.toCoin) : undefined,
-    toNetwork: er.toNetwork
-      ? { id: er.toNetwork.id, code: er.toNetwork.code, name: er.toNetwork.name, chain: er.toNetwork.chain }
-      : undefined,
-    fromAmount: er.fromAmount?.toString(),
-    toAmount: er.toAmount?.toString(),
-    receivedAmount: er.receivedAmount?.toString() ?? null,
-    acceptedAmount: er.acceptedAmount?.toString() ?? null,
-    estimatedRate: er.estimatedRate?.toString() ?? null,
-    feeAmount: er.feeAmount?.toString(),
-    clientWithdrawAddress: er.clientWithdrawAddress,
-    depositAddress: er.depositAddress ? { address: er.depositAddress.address } : null,
-    completedAt: er.completedAt,
-    failedReason: er.failedReason,
+    createdAt: er.createdAt,
+    from: {
+      coin: er.fromCoin?.code,
+      network: er.fromNetwork?.code,
+      amount: er.fromAmount?.toString(),
+    },
+    to: {
+      coin: er.toCoin?.code,
+      network: er.toNetwork?.code,
+      amount: er.toAmount?.toString(),
+    },
+    rate: er.estimatedRate?.toString() ?? null,
+    fee: er.feeAmount?.toString(),
+    depositAddress: er.depositAddress?.address ?? null,
+    withdrawAddress: er.clientWithdrawAddress,
     transactions: (er.transactions ?? []).map((tx: any) => ({
-      id: tx.id,
       type: tx.type,
       status: tx.status,
       amount: tx.amount?.toString(),
-      confirmedAmount: tx.confirmedAmount?.toString() ?? null,
-      txHash: tx.txHash,
-      createdAt: tx.createdAt,
-      detectedAt: tx.detectedAt,
-      confirmedAt: tx.confirmedAt,
+      txHash: tx.txHash ?? null,
     })),
   }
 }
@@ -133,7 +122,7 @@ const exchangeRequestInclude = {
 
 export const appRouter = t.router({
   // ── coins.list ────────────────────────────────────────
-  "coins.list": t.procedure.query(async ({ ctx }) => {
+  "coins.list": protectedProcedure.query(async ({ ctx }) => {
     const coins = await ctx.prisma.coin.findMany({
       where: { status: "ACTIVE" },
       include: coinInclude,
@@ -143,7 +132,7 @@ export const appRouter = t.router({
   }),
 
   // ── coins.byCode ─────────────────────────────────────
-  "coins.byCode": t.procedure
+  "coins.byCode": protectedProcedure
     .input(z.object({ code: z.string() }))
     .query(async ({ ctx, input }) => {
       const coin = await ctx.prisma.coin.findFirst({
@@ -155,7 +144,7 @@ export const appRouter = t.router({
     }),
 
   // ── limits ────────────────────────────────────────────
-  "coins.limits": t.procedure
+  "coins.limits": protectedProcedure
     .input(z.object({ coin: z.string() }))
     .query(async ({ ctx, input }) => {
       const coin = await ctx.prisma.coin.findUnique({
@@ -170,7 +159,7 @@ export const appRouter = t.router({
     }),
 
   // ── rate ──────────────────────────────────────────────
-  "exchange.rate": t.procedure
+  "exchange.rate": protectedProcedure
     .input(
       z.object({
         from: z.string(),
@@ -236,7 +225,7 @@ export const appRouter = t.router({
     }),
 
   // ── order.create ──────────────────────────────────────
-  "order.create": t.procedure
+  "order.create": protectedProcedure
     .input(
       z.object({
         from: z.string(),
@@ -319,6 +308,7 @@ export const appRouter = t.router({
         })
         return tx.exchangeRequest.create({
           data: {
+            orderId: generateOrderId(),
             fromCoinId: fromCoin.id,
             fromNetworkId: fromNet.id,
             toCoinId: toCoin.id,
@@ -339,11 +329,11 @@ export const appRouter = t.router({
     }),
 
   // ── order.byId ────────────────────────────────────────
-  "order.byId": t.procedure
+  "order.byId": protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const er = await ctx.prisma.exchangeRequest.findUnique({
-        where: { id: input.id },
+      const er = await ctx.prisma.exchangeRequest.findFirst({
+        where: { OR: [{ orderId: input.id }, { id: input.id }] },
         include: exchangeRequestInclude,
       })
       if (!er) throw new Error("Exchange request not found")
@@ -351,7 +341,7 @@ export const appRouter = t.router({
     }),
 
   // ── order.list ────────────────────────────────────────
-  "order.list": t.procedure
+  "order.list": protectedProcedure
     .input(
       z.object({
         page: z.number().int().min(1).default(1),

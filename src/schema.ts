@@ -39,33 +39,19 @@ export const typeDefs = /* GraphQL */ `
 
   # ──────────────────────────── Types ────────────────────────────
 
-  type Network {
-    id: String!
+  type CoinNetwork {
     code: String!
     name: String!
-    chain: String!
-    isDepositEnabled: Boolean!
-    isWithdrawEnabled: Boolean!
-    explorerUrl: String
-    imageUrl: String
-  }
-
-  type CoinNetwork {
-    network: Network!
-    contractAddress: String
-    decimals: Int!
     depositEnabled: Boolean!
     withdrawEnabled: Boolean!
   }
 
   type Coin {
-    id: String!
     code: String!
     name: String!
-    imageUrl: String
-    networks: [CoinNetwork!]!
     minDepositAmount: Decimal!
     maxDepositAmount: Decimal
+    networks: [CoinNetwork!]!
   }
 
   type CoinLimits {
@@ -89,47 +75,29 @@ export const typeDefs = /* GraphQL */ `
     feeAmount: Decimal!
   }
 
-  type DepositAddress {
-    address: String!
-  }
-
   type TransactionInfo {
-    id: String!
     type: TransactionType!
     status: TransactionStatus!
     amount: Decimal!
-    confirmedAmount: Decimal
     txHash: String
-    createdAt: DateTime!
-    detectedAt: DateTime
-    confirmedAt: DateTime
+  }
+
+  type ExchangeSide {
+    coin: String!
+    network: String!
+    amount: Decimal!
   }
 
   type ExchangeRequest {
     id: String!
-    createdAt: DateTime!
-    updatedAt: DateTime!
-
-    fromCoin: Coin!
-    fromNetwork: Network!
-    toCoin: Coin!
-    toNetwork: Network!
-
-    fromAmount: Decimal!
-    toAmount: Decimal!
-    receivedAmount: Decimal
-    acceptedAmount: Decimal
-
-    clientWithdrawAddress: String!
-    depositAddress: DepositAddress
-
     status: ExchangeRequestStatus!
-    estimatedRate: Decimal
-    feeAmount: Decimal!
-
-    completedAt: DateTime
-    failedReason: String
-
+    createdAt: DateTime!
+    from: ExchangeSide!
+    to: ExchangeSide!
+    rate: Decimal
+    fee: Decimal!
+    depositAddress: String
+    withdrawAddress: String!
     transactions: [TransactionInfo!]!
   }
 

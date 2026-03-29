@@ -1,3 +1,6 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -7,7 +10,63 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// --- Enums ---
+// --------------------------------------
+
+model User {
+  id             Int      @id @default(autoincrement())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  name           String?
+  email          String   @unique
+  hashedPassword String?
+  role           String   @default("USER")
+  status         String   @default("ACTIVE")
+
+  tokens   Token[]
+  sessions Session[]
+  apiKeys  ApiKey[]
+}
+
+model Session {
+  id                 Int       @id @default(autoincrement())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  expiresAt          DateTime?
+  handle             String    @unique
+  hashedSessionToken String?
+  antiCSRFToken      String?
+  publicData         String?
+  privateData        String?
+
+  user   User? @relation(fields: [userId], references: [id])
+  userId Int?
+}
+
+model Token {
+  id          Int      @id @default(autoincrement())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  hashedToken String
+  type        String
+  // See note below about TokenType enum
+  // type        TokenType
+  expiresAt   DateTime
+  sentTo      String
+
+  user   User @relation(fields: [userId], references: [id])
+  userId Int
+
+  @@unique([hashedToken, type])
+}
+
+// NOTE: It's highly recommended to use an enum for the token type
+//       but enums only work in Postgres.
+//       See: https://blitzjs.com/docs/database-overview#switch-to-postgre-sql
+// enum TokenType {
+//   RESET_PASSWORD
+// }
+
+// --------------------------------------
 
 enum CoinStatus {
   ACTIVE
@@ -68,52 +127,6 @@ enum GasWalletType {
   AUXILIARY
 }
 
-// --- Models ---
-
-model User {
-  id             Int      @id @default(autoincrement())
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  name           String?
-  email          String   @unique
-  hashedPassword String?
-  role           String   @default("USER")
-  status         String   @default("ACTIVE")
-
-  tokens   Token[]
-  sessions Session[]
-}
-
-model Session {
-  id                 Int       @id @default(autoincrement())
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  expiresAt          DateTime?
-  handle             String    @unique
-  hashedSessionToken String?
-  antiCSRFToken      String?
-  publicData         String?
-  privateData        String?
-
-  user   User? @relation(fields: [userId], references: [id])
-  userId Int?
-}
-
-model Token {
-  id          Int      @id @default(autoincrement())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  hashedToken String
-  type        String
-  expiresAt   DateTime
-  sentTo      String
-
-  user   User @relation(fields: [userId], references: [id])
-  userId Int
-
-  @@unique([hashedToken, type])
-}
-
 model Coin {
   id        String     @id @default(cuid())
   createdAt DateTime   @default(now())
@@ -123,14 +136,19 @@ model Coin {
   imageUrl  String?
   status    CoinStatus @default(ACTIVE)
 
+  // Fee and limits configuration
   floatFeePercent  Decimal  @default(0)
   fixedFeePercent  Decimal  @default(0)
   minimumFee       Decimal  @default(0)
   minDepositAmount Decimal  @default(0)
   maxDepositAmount Decimal?
 
+  /// If set, transactions with amount >= this value require manual admin review.
+  /// null means no manual review threshold.
   manualReviewAmount Decimal?
-  updatedBy          String?
+
+  // Audit
+  updatedBy String?
 
   mappings      CoinNetworkMapping[]
   incomingTx    Transaction[]        @relation("IncomingCoin")
@@ -147,6 +165,9 @@ model Network {
   code              String        @unique
   name              String
   chain             String
+  /// Optional Tatum v3 wallet slug (e.g. "ethereum", "bitcoin", "bsc", "tron").
+  /// If set, master wallet generation will use this value for the
+  /// `/v3/{slug}/wallet` endpoint instead of deriving it from `chain`.
   tatumWalletSlug   String?
   status            NetworkStatus @default(ACTIVE)
   isDepositEnabled  Boolean       @default(true)
@@ -156,6 +177,9 @@ model Network {
   confirmationRules Json?
   imageUrl          String?
   lastSyncedAt      DateTime?
+  /// KuCoin chain identifier for this network (e.g. "bsc", "eth", "trx").
+  /// If set, used as-is when communicating with KuCoin API.
+  /// If not set, falls back to lowercase of `chain`.
   kucoinChainCode   String?
 
   mappings            CoinNetworkMapping[]
@@ -197,7 +221,10 @@ model Subscription {
   webhookUrl          String
   tatumSubscriptionId String           @unique
   isActive            Boolean          @default(true)
-  chain               String?
+
+  /// Cached blockchain chain code used for this subscription (e.g. "ETH", "TRON").
+  /// Optional for older rows; all new subscriptions should populate this.
+  chain String?
 
   depositAddressId String
   depositAddress   DepositAddress @relation(fields: [depositAddressId], references: [id])
@@ -257,6 +284,7 @@ model Transaction {
 
 model ExchangeRequest {
   id        String   @id @default(cuid())
+  orderId   String?  @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -272,13 +300,20 @@ model ExchangeRequest {
   toNetworkId String
   toNetwork   Network @relation("ToNetwork", fields: [toNetworkId], references: [id])
 
+  /// Что пользователь указал в заявке
   fromAmount Decimal
   toAmount   Decimal
 
+  /// Что реально пришло по депозиту
   receivedAmount Decimal?
+
+  /// Сколько принято в обработку для обмена
   acceptedAmount Decimal?
 
-  refundedAmount  Decimal @default(0)
+  /// Сколько ушло в refund
+  refundedAmount Decimal @default(0)
+
+  /// Итоговый факт refund
   isRefunded      Boolean @default(false)
   isPartialRefund Boolean @default(false)
   refundReason    String?
@@ -290,9 +325,11 @@ model ExchangeRequest {
 
   status ExchangeRequestStatus @default(CREATED)
 
+  /// Можно зафиксировать расчет на момент создания заявки
   estimatedRate Decimal?
   feeAmount     Decimal  @default(0)
 
+  /// Итог обработки заявки
   completedAt  DateTime?
   failedReason String?
 
@@ -313,6 +350,7 @@ model MasterWallet {
   network   Network @relation(fields: [networkId], references: [id])
 
   xpub               String       @id @unique
+  /// Зашифрованный мнемоник (ciphertext), а не голый seed
   surprise           String?
   status             WalletStatus @default(ACTIVE)
   currentIndex       Int          @default(0)
@@ -351,7 +389,9 @@ model GasWallet {
   network   Network @relation(fields: [networkId], references: [id])
 
   address            String        @unique
+  /// XPUB for this gas wallet (we only use address index 0).
   xpub               String        @unique
+  /// Encrypted mnemonic (same format as MasterWallet.surprise).
   surprise           String?
   type               GasWalletType @default(MASTER)
   status             WalletStatus  @default(ACTIVE)
@@ -370,4 +410,34 @@ model SystemLog {
   message   String
   data      Json?
   createdBy String?
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Human-readable label for this key (e.g. "Production", "Staging")
+  name String
+
+  /// First 8 characters of the raw key for identification (e.g. "xswp_abc")
+  prefix String
+
+  /// HMAC-SHA256 hash of the raw API key (for lookup / verification)
+  hashedKey String @unique
+
+  /// AES-256-GCM encrypted raw key (iv:authTag:ciphertext, hex-encoded)
+  encryptedKey String
+
+  /// Per-key random salt used in HMAC hashing (hex-encoded)
+  salt String
+
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([isActive])
 }

@@ -1,30 +1,20 @@
 import { Prisma, PrismaClient } from "@prisma/client"
 import { resolveNetwork } from "../lib/resolveNetwork"
+import { validateApiKey } from "../lib/auth"
+import { generateOrderId } from "../lib/generateOrderId"
 type Decimal = Prisma.Decimal
 
 // ─── Shared helpers ─────────────────────────────────────────
 
 function serializeCoin(coin: any) {
   return {
-    id: coin.id,
     code: coin.code,
     name: coin.name,
-    imageUrl: coin.imageUrl,
     minDepositAmount: coin.minDepositAmount?.toString(),
     maxDepositAmount: coin.maxDepositAmount?.toString() ?? null,
     networks: (coin.mappings ?? []).map((m: any) => ({
-      network: {
-        id: m.network.id,
-        code: m.network.code,
-        name: m.network.name,
-        chain: m.network.chain,
-        isDepositEnabled: m.network.isDepositEnabled,
-        isWithdrawEnabled: m.network.isWithdrawEnabled,
-        explorerUrl: m.network.explorerUrl,
-        imageUrl: m.network.imageUrl,
-      },
-      contractAddress: m.contractAddress,
-      decimals: m.decimals,
+      code: m.network.code,
+      name: m.network.name,
       depositEnabled: m.depositEnabled,
       withdrawEnabled: m.withdrawEnabled,
     })),
@@ -33,38 +23,28 @@ function serializeCoin(coin: any) {
 
 function serializeExchangeRequest(er: any) {
   return {
-    id: er.id,
-    createdAt: er.createdAt,
-    updatedAt: er.updatedAt,
+    id: er.orderId ?? er.id,
     status: er.status,
-    fromCoin: er.fromCoin ? serializeCoin(er.fromCoin) : undefined,
-    fromNetwork: er.fromNetwork
-      ? { id: er.fromNetwork.id, code: er.fromNetwork.code, name: er.fromNetwork.name, chain: er.fromNetwork.chain }
-      : undefined,
-    toCoin: er.toCoin ? serializeCoin(er.toCoin) : undefined,
-    toNetwork: er.toNetwork
-      ? { id: er.toNetwork.id, code: er.toNetwork.code, name: er.toNetwork.name, chain: er.toNetwork.chain }
-      : undefined,
-    fromAmount: er.fromAmount?.toString(),
-    toAmount: er.toAmount?.toString(),
-    receivedAmount: er.receivedAmount?.toString() ?? null,
-    acceptedAmount: er.acceptedAmount?.toString() ?? null,
-    estimatedRate: er.estimatedRate?.toString() ?? null,
-    feeAmount: er.feeAmount?.toString(),
-    clientWithdrawAddress: er.clientWithdrawAddress,
-    depositAddress: er.depositAddress ? { address: er.depositAddress.address } : null,
-    completedAt: er.completedAt,
-    failedReason: er.failedReason,
+    createdAt: er.createdAt,
+    from: {
+      coin: er.fromCoin?.code,
+      network: er.fromNetwork?.code,
+      amount: er.fromAmount?.toString(),
+    },
+    to: {
+      coin: er.toCoin?.code,
+      network: er.toNetwork?.code,
+      amount: er.toAmount?.toString(),
+    },
+    rate: er.estimatedRate?.toString() ?? null,
+    fee: er.feeAmount?.toString(),
+    depositAddress: er.depositAddress?.address ?? null,
+    withdrawAddress: er.clientWithdrawAddress,
     transactions: (er.transactions ?? []).map((tx: any) => ({
-      id: tx.id,
       type: tx.type,
       status: tx.status,
       amount: tx.amount?.toString(),
-      confirmedAmount: tx.confirmedAmount?.toString() ?? null,
-      txHash: tx.txHash,
-      createdAt: tx.createdAt,
-      detectedAt: tx.detectedAt,
-      confirmedAt: tx.confirmedAt,
+      txHash: tx.txHash ?? null,
     })),
   }
 }
@@ -149,6 +129,12 @@ export async function handleRestRequest(
         "access-control-allow-headers": "content-type, x-api-key, api-key",
       },
     })
+  }
+
+  // ── API Key authentication ──
+  const apiKey = req.headers.get("x-api-key") ?? req.headers.get("api-key")
+  if (!(await validateApiKey(prisma, apiKey))) {
+    return error("Invalid or missing API key", 401)
   }
 
   // ─── GET /api/v1/coins ─────────────────────────────────
@@ -343,6 +329,7 @@ export async function handleRestRequest(
         })
         return tx.exchangeRequest.create({
           data: {
+            orderId: generateOrderId(),
             fromCoinId: fromCoin.id,
             fromNetworkId: fromNet.id,
             toCoinId: toCoin.id,
@@ -368,9 +355,9 @@ export async function handleRestRequest(
   // ─── GET /api/v1/order/:id ────────────────────────────
   const orderMatch = path.match(/^\/api\/v1\/order\/([a-zA-Z0-9_-]+)$/)
   if (method === "GET" && orderMatch) {
-    const id = orderMatch[1]!
-    const er = await prisma.exchangeRequest.findUnique({
-      where: { id },
+    const identifier = orderMatch[1]!
+    const er = await prisma.exchangeRequest.findFirst({
+      where: { OR: [{ orderId: identifier }, { id: identifier }] },
       include: exchangeRequestInclude,
     })
     if (!er) return error("Exchange request not found", 404)
