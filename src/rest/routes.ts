@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client"
+import { resolveNetwork } from "../lib/resolveNetwork"
 type Decimal = Prisma.Decimal
 
 // ─── Shared helpers ─────────────────────────────────────────
@@ -209,8 +210,8 @@ export async function handleRestRequest(
       if (!toCoin) return error(`Coin ${to} not found or inactive`, 404)
 
       const [fromNet, toNet] = await Promise.all([
-        prisma.network.findFirst({ where: { code: fromNetwork, status: "ACTIVE" } }),
-        prisma.network.findFirst({ where: { code: toNetwork, status: "ACTIVE" } }),
+        resolveNetwork(prisma, fromNetwork),
+        resolveNetwork(prisma, toNetwork),
       ])
       if (!fromNet) return error(`Network ${fromNetwork} not found or inactive`, 404)
       if (!toNet) return error(`Network ${toNetwork} not found or inactive`, 404)
@@ -286,8 +287,8 @@ export async function handleRestRequest(
       if (!toCoin) return error(`Coin ${toUpper} not found or inactive`, 404)
 
       const [fromNet, toNet] = await Promise.all([
-        prisma.network.findFirst({ where: { code: fromNetUpper, status: "ACTIVE" } }),
-        prisma.network.findFirst({ where: { code: toNetUpper, status: "ACTIVE" } }),
+        resolveNetwork(prisma, fromNetUpper),
+        resolveNetwork(prisma, toNetUpper),
       ])
       if (!fromNet) return error(`Network ${fromNetUpper} not found or inactive`, 404)
       if (!toNet) return error(`Network ${toNetUpper} not found or inactive`, 404)

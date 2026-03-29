@@ -1,6 +1,7 @@
 import { initTRPC } from "@trpc/server"
 import { z } from "zod"
 import { Prisma, PrismaClient } from "@prisma/client"
+import { resolveNetwork } from "../lib/resolveNetwork"
 
 type Decimal = Prisma.Decimal
 
@@ -193,8 +194,8 @@ export const appRouter = t.router({
       if (!toCoin) throw new Error(`Coin ${to} not found or inactive`)
 
       const [fromNet, toNet] = await Promise.all([
-        ctx.prisma.network.findFirst({ where: { code: fromNetCode, status: "ACTIVE" } }),
-        ctx.prisma.network.findFirst({ where: { code: toNetCode, status: "ACTIVE" } }),
+        resolveNetwork(ctx.prisma, fromNetCode),
+        resolveNetwork(ctx.prisma, toNetCode),
       ])
       if (!fromNet) throw new Error(`Network ${fromNetCode} not found or inactive`)
       if (!toNet) throw new Error(`Network ${toNetCode} not found or inactive`)
@@ -262,8 +263,8 @@ export const appRouter = t.router({
       if (!toCoin) throw new Error(`Coin ${toUpper} not found or inactive`)
 
       const [fromNet, toNet] = await Promise.all([
-        ctx.prisma.network.findFirst({ where: { code: fromNetUpper, status: "ACTIVE" } }),
-        ctx.prisma.network.findFirst({ where: { code: toNetUpper, status: "ACTIVE" } }),
+        resolveNetwork(ctx.prisma, fromNetUpper),
+        resolveNetwork(ctx.prisma, toNetUpper),
       ])
       if (!fromNet) throw new Error(`Network ${fromNetUpper} not found or inactive`)
       if (!toNet) throw new Error(`Network ${toNetUpper} not found or inactive`)

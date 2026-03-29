@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client"
 type Decimal = Prisma.Decimal
 import type { GraphQLContext } from "../context"
+import { resolveNetwork } from "../lib/resolveNetwork"
 
 export const queryResolvers = {
   Query: {
@@ -79,8 +80,8 @@ export const queryResolvers = {
 
       // Validate networks
       const [fromNet, toNet] = await Promise.all([
-        ctx.prisma.network.findFirst({ where: { code: fromNetwork, status: "ACTIVE" } }),
-        ctx.prisma.network.findFirst({ where: { code: toNetwork, status: "ACTIVE" } }),
+        resolveNetwork(ctx.prisma, fromNetwork),
+        resolveNetwork(ctx.prisma, toNetwork),
       ])
       if (!fromNet) throw new Error(`Network ${fromNetwork} not found or inactive`)
       if (!toNet) throw new Error(`Network ${toNetwork} not found or inactive`)
