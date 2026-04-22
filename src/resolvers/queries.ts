@@ -1,8 +1,8 @@
 import { Prisma } from "@prisma/client"
-type Decimal = Prisma.Decimal
 import type { GraphQLContext } from "../context"
 import { resolveNetwork } from "../lib/resolveNetwork"
 import { validateApiKey } from "../lib/auth"
+import { getKmsRate } from "../lib/kms"
 
 export const queryResolvers = {
   Query: {
@@ -63,7 +63,7 @@ export const queryResolvers = {
      * Mirrors Swapuz GET /api/home/v1/rate
      *
      * Rate logic:
-     *  - Uses Binance spot price as base rate
+     *  - Uses XSwapo KMS (rate.getCryptoRatio) as single source of truth
      *  - Applies float fee from the source coin
      *  - Returns the net amount the user would receive
      */
@@ -103,8 +103,7 @@ export const queryResolvers = {
       if (!fromMapping?.isActive) throw new Error(`${from} is not available on ${fromNetwork}`)
       if (!toMapping?.isActive) throw new Error(`${to} is not available on ${toNetwork}`)
 
-      // Get rate from Binance
-      const rate = await getBinanceRate(fromCoin.code, toCoin.code)
+      const rate = await getKmsRate(fromCoin.code, toCoin.code)
 
       const inputAmount = new Prisma.Decimal(amount)
 
@@ -254,43 +253,4 @@ export const queryResolvers = {
         txHash: tx.txHash ?? null,
       })),
   },
-}
-
-// ──────────────────── Binance Rate Helper ────────────────────
-
-async function getBinanceRate(fromCode: string, toCode: string): Promise<Decimal> {
-  // Same pair
-  if (fromCode === toCode) return new Prisma.Decimal(1)
-
-  // Try direct pair
-  const directRate = await fetchBinancePrice(`${fromCode}${toCode}`)
-  if (directRate) return directRate
-
-  // Try inverted pair
-  const invertedRate = await fetchBinancePrice(`${toCode}${fromCode}`)
-  if (invertedRate) return new Prisma.Decimal(1).div(invertedRate)
-
-  // Fallback: route through USDT
-  if (fromCode !== "USDT" && toCode !== "USDT") {
-    const fromUsdt = await fetchBinancePrice(`${fromCode}USDT`)
-    const toUsdt = await fetchBinancePrice(`${toCode}USDT`)
-    if (fromUsdt && toUsdt) {
-      return fromUsdt.div(toUsdt)
-    }
-  }
-
-  throw new Error(`Unable to fetch exchange rate for ${fromCode} → ${toCode}`)
-}
-
-async function fetchBinancePrice(symbol: string): Promise<Decimal | null> {
-  try {
-    const res = await fetch(
-      `https://api.binance.com/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`,
-    )
-    if (!res.ok) return null
-    const data = (await res.json()) as { price: string }
-    return new Prisma.Decimal(data.price)
-  } catch {
-    return null
-  }
 }

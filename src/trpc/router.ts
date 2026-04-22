@@ -4,8 +4,7 @@ import { Prisma, PrismaClient } from "@prisma/client"
 import { resolveNetwork } from "../lib/resolveNetwork"
 import { validateApiKey } from "../lib/auth"
 import { generateOrderId } from "../lib/generateOrderId"
-
-type Decimal = Prisma.Decimal
+import { getKmsRate, deriveDepositAddress } from "../lib/kms"
 
 // ─── Context ────────────────────────────────────────────────
 
@@ -67,39 +66,6 @@ function serializeExchangeRequest(er: any) {
       amount: tx.amount?.toString(),
       txHash: tx.txHash ?? null,
     })),
-  }
-}
-
-// ─── Binance rate ───────────────────────────────────────────
-
-async function getBinanceRate(fromCode: string, toCode: string): Promise<Decimal> {
-  if (fromCode === toCode) return new Prisma.Decimal(1)
-
-  const direct = await fetchBinancePrice(`${fromCode}${toCode}`)
-  if (direct) return direct
-
-  const inverted = await fetchBinancePrice(`${toCode}${fromCode}`)
-  if (inverted) return new Prisma.Decimal(1).div(inverted)
-
-  if (fromCode !== "USDT" && toCode !== "USDT") {
-    const fromUsdt = await fetchBinancePrice(`${fromCode}USDT`)
-    const toUsdt = await fetchBinancePrice(`${toCode}USDT`)
-    if (fromUsdt && toUsdt) return fromUsdt.div(toUsdt)
-  }
-
-  throw new Error(`Unable to fetch exchange rate for ${fromCode} → ${toCode}`)
-}
-
-async function fetchBinancePrice(symbol: string): Promise<Decimal | null> {
-  try {
-    const res = await fetch(
-      `https://api.binance.com/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`,
-    )
-    if (!res.ok) return null
-    const data = (await res.json()) as { price: string }
-    return new Prisma.Decimal(data.price)
-  } catch {
-    return null
   }
 }
 
@@ -200,7 +166,7 @@ export const appRouter = t.router({
       if (!fromMapping?.isActive) throw new Error(`${from} is not available on ${fromNetCode}`)
       if (!toMapping?.isActive) throw new Error(`${to} is not available on ${toNetCode}`)
 
-      const rate = await getBinanceRate(fromCoin.code, toCoin.code)
+      const rate = await getKmsRate(fromCoin.code, toCoin.code)
       const inputAmount = new Prisma.Decimal(input.amount)
 
       if (inputAmount.lt(fromCoin.minDepositAmount)) {
@@ -282,7 +248,7 @@ export const appRouter = t.router({
         throw new Error(`Amount above maximum of ${fromCoin.maxDepositAmount} ${fromUpper}`)
       }
 
-      const rate = await getBinanceRate(fromCoin.code, toCoin.code)
+      const rate = await getKmsRate(fromCoin.code, toCoin.code)
       let feeAmount = inputAmount.mul(fromCoin.floatFeePercent).div(100)
       if (feeAmount.lt(fromCoin.minimumFee)) feeAmount = fromCoin.minimumFee
       const toAmount = inputAmount.minus(feeAmount).mul(rate)
@@ -294,36 +260,46 @@ export const appRouter = t.router({
         throw new Error(`No active master wallet for ${fromUpper} on ${fromNetUpper}. Contact support.`)
       }
 
-      const exchangeRequest = await ctx.prisma.$transaction(async (tx) => {
-        const updatedWallet = await tx.masterWallet.update({
-          where: { xpub: masterWallet.xpub },
-          data: { currentIndex: { increment: 1 }, generatedAddresses: { increment: 1 } },
-        })
-        const depositAddress = await tx.depositAddress.create({
-          data: {
-            address: `pending-${fromCoin.code}-${fromNet.code}-${updatedWallet.currentIndex}`,
+      const exchangeRequest = await ctx.prisma.$transaction(
+        async (tx) => {
+          const updatedWallet = await tx.masterWallet.update({
+            where: { xpub: masterWallet.xpub },
+            data: { currentIndex: { increment: 1 }, generatedAddresses: { increment: 1 } },
+          })
+
+          const derivedAddress = await deriveDepositAddress({
+            xpub: masterWallet.xpub,
             index: updatedWallet.currentIndex,
-            masterWalletxpub: masterWallet.xpub,
-          },
-        })
-        return tx.exchangeRequest.create({
-          data: {
-            orderId: generateOrderId(),
-            fromCoinId: fromCoin.id,
-            fromNetworkId: fromNet.id,
-            toCoinId: toCoin.id,
-            toNetworkId: toNet.id,
-            fromAmount: inputAmount,
-            toAmount,
-            clientWithdrawAddress: trimmedAddress,
-            depositAddressId: depositAddress.id,
-            status: "CREATED",
-            estimatedRate: rate,
-            feeAmount,
-          },
-          include: exchangeRequestInclude,
-        })
-      })
+            chain: fromNet.chain,
+          })
+
+          const depositAddress = await tx.depositAddress.create({
+            data: {
+              address: derivedAddress,
+              index: updatedWallet.currentIndex,
+              masterWalletxpub: masterWallet.xpub,
+            },
+          })
+          return tx.exchangeRequest.create({
+            data: {
+              orderId: generateOrderId(),
+              fromCoinId: fromCoin.id,
+              fromNetworkId: fromNet.id,
+              toCoinId: toCoin.id,
+              toNetworkId: toNet.id,
+              fromAmount: inputAmount,
+              toAmount,
+              clientWithdrawAddress: trimmedAddress,
+              depositAddressId: depositAddress.id,
+              status: "CREATED",
+              estimatedRate: rate,
+              feeAmount,
+            },
+            include: exchangeRequestInclude,
+          })
+        },
+        { timeout: 20_000, maxWait: 5_000 },
+      )
 
       return serializeExchangeRequest(exchangeRequest)
     }),

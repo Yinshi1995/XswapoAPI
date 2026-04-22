@@ -1,9 +1,9 @@
 import { Prisma } from "@prisma/client"
-type Decimal = Prisma.Decimal
 import type { GraphQLContext } from "../context"
 import { resolveNetwork } from "../lib/resolveNetwork"
 import { validateApiKey } from "../lib/auth"
 import { generateOrderId } from "../lib/generateOrderId"
+import { getKmsRate, deriveDepositAddress } from "../lib/kms"
 
 export const mutationResolvers = {
   Mutation: {
@@ -14,17 +14,14 @@ export const mutationResolvers = {
      * Steps:
      *  1. Validate coins, networks, and mappings
      *  2. Validate amount against limits
-     *  3. Calculate estimated rate and fee
+     *  3. Calculate estimated rate and fee via KMS
      *  4. Find the active master wallet for fromCoin+fromNetwork
-     *  5. Derive next deposit address (increment index)
+     *  5. Derive next deposit address via KMS (increment index)
      *  6. Create the ExchangeRequest + DepositAddress in a transaction
      *  7. Return the full exchange request
      *
-     * NOTE: Tatum subscription creation (webhook setup) is handled by a
-     * separate background service / the admin flow. This API only creates
-     * the DB records. The admin app's createExchangeRequest mutation handles
-     * the full Tatum orchestration — we keep the client API focused on
-     * data persistence and let the webhook/subscription layer run separately.
+     * All blockchain-side operations (rate lookup, address derivation)
+     * are delegated to the XSwapo KMS microservice. See src/lib/kms.ts.
      */
     createExchangeRequest: async (
       _parent: unknown,
@@ -44,7 +41,6 @@ export const mutationResolvers = {
 
       const { from, fromNetwork, to, toNetwork, amount, address } = args.input
 
-      // ── 1. Validate coins ──
       const [fromCoin, toCoin] = await Promise.all([
         ctx.prisma.coin.findFirst({ where: { code: from, status: "ACTIVE" } }),
         ctx.prisma.coin.findFirst({ where: { code: to, status: "ACTIVE" } }),
@@ -52,7 +48,6 @@ export const mutationResolvers = {
       if (!fromCoin) throw new Error(`Coin ${from} not found or inactive`)
       if (!toCoin) throw new Error(`Coin ${to} not found or inactive`)
 
-      // ── 2. Validate networks ──
       const [fromNet, toNet] = await Promise.all([
         resolveNetwork(ctx.prisma, fromNetwork),
         resolveNetwork(ctx.prisma, toNetwork),
@@ -60,7 +55,6 @@ export const mutationResolvers = {
       if (!fromNet) throw new Error(`Network ${fromNetwork} not found or inactive`)
       if (!toNet) throw new Error(`Network ${toNetwork} not found or inactive`)
 
-      // ── 3. Validate coin-network mappings ──
       const [fromMapping, toMapping] = await Promise.all([
         ctx.prisma.coinNetworkMapping.findUnique({
           where: {
@@ -80,7 +74,6 @@ export const mutationResolvers = {
         throw new Error(`Withdrawals for ${to} on ${toNetwork} are not available`)
       }
 
-      // ── 4. Validate amount ──
       const inputAmount = new Prisma.Decimal(amount)
       if (inputAmount.lte(0)) throw new Error("Amount must be positive")
       if (inputAmount.lt(fromCoin.minDepositAmount)) {
@@ -94,12 +87,10 @@ export const mutationResolvers = {
         )
       }
 
-      // ── 5. Validate address (basic non-empty check) ──
       const trimmedAddress = address.trim()
       if (!trimmedAddress) throw new Error("Withdraw address is required")
 
-      // ── 6. Calculate rate and fee ──
-      const rate = await getBinanceRate(fromCoin.code, toCoin.code)
+      const rate = await getKmsRate(fromCoin.code, toCoin.code)
       const feePercent = fromCoin.floatFeePercent
       let feeAmount = inputAmount.mul(feePercent).div(100)
       if (feeAmount.lt(fromCoin.minimumFee)) {
@@ -108,7 +99,6 @@ export const mutationResolvers = {
       const effectiveAmount = inputAmount.minus(feeAmount)
       const toAmount = effectiveAmount.mul(rate)
 
-      // ── 7. Find master wallet for the deposit side ──
       const masterWallet = await ctx.prisma.masterWallet.findFirst({
         where: {
           coinId: fromCoin.id,
@@ -122,104 +112,72 @@ export const mutationResolvers = {
         )
       }
 
-      // ── 8. Create everything in a DB transaction ──
-      const exchangeRequest = await ctx.prisma.$transaction(async (tx) => {
-        // Increment master wallet index
-        const updatedWallet = await tx.masterWallet.update({
-          where: { xpub: masterWallet.xpub },
-          data: {
-            currentIndex: { increment: 1 },
-            generatedAddresses: { increment: 1 },
-          },
-        })
+      const exchangeRequest = await ctx.prisma.$transaction(
+        async (tx) => {
+          const updatedWallet = await tx.masterWallet.update({
+            where: { xpub: masterWallet.xpub },
+            data: {
+              currentIndex: { increment: 1 },
+              generatedAddresses: { increment: 1 },
+            },
+          })
 
-        const depositIndex = updatedWallet.currentIndex
+          const depositIndex = updatedWallet.currentIndex
 
-        // Generate deposit address via Tatum (placeholder — in production
-        // this calls Tatum API). For now we create a DB record; the actual
-        // blockchain address derivation happens via the admin service or a
-        // shared Tatum integration.
-        const depositAddress = await tx.depositAddress.create({
-          data: {
-            address: `pending-${fromCoin.code}-${fromNet.code}-${depositIndex}`,
+          // Delegate address derivation to KMS. For secp256k1 chains the
+          // stored `xpub` is an extended public key; for Ed25519 chains
+          // it is a mnemonic — KMS dispatches by `chain`.
+          const derivedAddress = await deriveDepositAddress({
+            xpub: masterWallet.xpub,
             index: depositIndex,
-            masterWalletxpub: masterWallet.xpub,
-          },
-        })
+            chain: fromNet.chain,
+          })
 
-        // Create the exchange request
-        const er = await tx.exchangeRequest.create({
-          data: {
-            orderId: generateOrderId(),
-            fromCoinId: fromCoin.id,
-            fromNetworkId: fromNet.id,
-            toCoinId: toCoin.id,
-            toNetworkId: toNet.id,
-            fromAmount: inputAmount,
-            toAmount,
-            clientWithdrawAddress: trimmedAddress,
-            depositAddressId: depositAddress.id,
-            status: "CREATED",
-            estimatedRate: rate,
-            feeAmount,
-          },
-          include: {
-            fromCoin: {
-              include: {
-                mappings: { where: { isActive: true }, include: { network: true } },
-              },
+          const depositAddress = await tx.depositAddress.create({
+            data: {
+              address: derivedAddress,
+              index: depositIndex,
+              masterWalletxpub: masterWallet.xpub,
             },
-            toCoin: {
-              include: {
-                mappings: { where: { isActive: true }, include: { network: true } },
-              },
-            },
-            fromNetwork: true,
-            toNetwork: true,
-            depositAddress: true,
-            transactions: true,
-          },
-        })
+          })
 
-        return er
-      })
+          return tx.exchangeRequest.create({
+            data: {
+              orderId: generateOrderId(),
+              fromCoinId: fromCoin.id,
+              fromNetworkId: fromNet.id,
+              toCoinId: toCoin.id,
+              toNetworkId: toNet.id,
+              fromAmount: inputAmount,
+              toAmount,
+              clientWithdrawAddress: trimmedAddress,
+              depositAddressId: depositAddress.id,
+              status: "CREATED",
+              estimatedRate: rate,
+              feeAmount,
+            },
+            include: {
+              fromCoin: {
+                include: {
+                  mappings: { where: { isActive: true }, include: { network: true } },
+                },
+              },
+              toCoin: {
+                include: {
+                  mappings: { where: { isActive: true }, include: { network: true } },
+                },
+              },
+              fromNetwork: true,
+              toNetwork: true,
+              depositAddress: true,
+              transactions: true,
+            },
+          })
+        },
+        { timeout: 20_000, maxWait: 5_000 },
+      )
 
       return exchangeRequest
     },
   },
-}
-
-// ──────────────────── Binance Rate Helper ────────────────────
-
-async function getBinanceRate(fromCode: string, toCode: string): Promise<Decimal> {
-  if (fromCode === toCode) return new Prisma.Decimal(1)
-
-  const directRate = await fetchBinancePrice(`${fromCode}${toCode}`)
-  if (directRate) return directRate
-
-  const invertedRate = await fetchBinancePrice(`${toCode}${fromCode}`)
-  if (invertedRate) return new Prisma.Decimal(1).div(invertedRate)
-
-  if (fromCode !== "USDT" && toCode !== "USDT") {
-    const fromUsdt = await fetchBinancePrice(`${fromCode}USDT`)
-    const toUsdt = await fetchBinancePrice(`${toCode}USDT`)
-    if (fromUsdt && toUsdt) {
-      return fromUsdt.div(toUsdt)
-    }
-  }
-
-  throw new Error(`Unable to fetch exchange rate for ${fromCode} → ${toCode}`)
-}
-
-async function fetchBinancePrice(symbol: string): Promise<Decimal | null> {
-  try {
-    const res = await fetch(
-      `https://api.binance.com/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`,
-    )
-    if (!res.ok) return null
-    const data = (await res.json()) as { price: string }
-    return new Prisma.Decimal(data.price)
-  } catch {
-    return null
-  }
 }
