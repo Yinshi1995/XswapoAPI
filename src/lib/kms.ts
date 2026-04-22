@@ -13,31 +13,40 @@ interface TRPCResponse<T> {
 async function kmsFetch<T>(path: string, init: RequestInit, label: string): Promise<T> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), KMS_TIMEOUT_MS)
+  const fullUrl = `${KMS_URL}/trpc/${path}`
+  let res: Response
   try {
-    const res = await fetch(`${KMS_URL}/trpc/${path}`, { ...init, signal: controller.signal })
-    const text = await res.text()
-    let body: TRPCResponse<T>
-    try {
-      body = JSON.parse(text) as TRPCResponse<T>
-    } catch {
-      throw new Error(`KMS ${label} returned non-JSON response (${res.status}): ${text.slice(0, 200)}`)
-    }
-    if (!res.ok || body.error) {
-      const msg = body.error?.message ?? `HTTP ${res.status}`
-      throw new Error(`KMS ${label} failed: ${msg}`)
-    }
-    if (body.result === undefined || body.result.data === undefined) {
-      throw new Error(`KMS ${label}: empty result`)
-    }
-    return body.result.data
+    res = await fetch(fullUrl, { ...init, signal: controller.signal })
   } catch (e: any) {
-    if (e.name === "AbortError") {
-      throw new Error(`KMS ${label} timed out after ${KMS_TIMEOUT_MS}ms`)
+    if (e?.name === "AbortError") {
+      throw new Error(`KMS ${label} timed out after ${KMS_TIMEOUT_MS}ms (url=${KMS_URL})`)
     }
-    throw e
+    // Network-level failure (DNS / connection refused / TLS / …).
+    throw new Error(
+      `KMS ${label} unreachable at ${KMS_URL}: ${e?.message ?? e}. ` +
+        `Check the KMS_URL env variable and that the KMS service is running.`,
+    )
   } finally {
     clearTimeout(timer)
   }
+
+  const text = await res.text()
+  let body: TRPCResponse<T>
+  try {
+    body = JSON.parse(text) as TRPCResponse<T>
+  } catch {
+    throw new Error(
+      `KMS ${label} returned non-JSON response (${res.status}) from ${KMS_URL}: ${text.slice(0, 200)}`,
+    )
+  }
+  if (!res.ok || body.error) {
+    const msg = body.error?.message ?? `HTTP ${res.status}`
+    throw new Error(`KMS ${label} failed: ${msg}`)
+  }
+  if (body.result === undefined || body.result.data === undefined) {
+    throw new Error(`KMS ${label}: empty result`)
+  }
+  return body.result.data
 }
 
 async function kmsGet<T>(path: string, input: unknown): Promise<T> {
