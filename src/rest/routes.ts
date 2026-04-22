@@ -1,8 +1,8 @@
 import { Prisma, PrismaClient } from "@prisma/client"
 import { resolveNetwork } from "../lib/resolveNetwork"
 import { validateApiKey } from "../lib/auth"
-import { generateOrderId } from "../lib/generateOrderId"
-import { getKmsRate, deriveDepositAddress } from "../lib/kms"
+import { getKmsRate } from "../lib/kms"
+import { createExchangeOrder, exchangeRequestInclude } from "../lib/orders"
 
 // ─── Shared helpers ─────────────────────────────────────────
 
@@ -63,17 +63,6 @@ function json(data: unknown, status = 200) {
 
 function error(message: string, status = 400) {
   return json({ error: message, status }, status)
-}
-
-// ─── Exchange request include preset ────────────────────────
-
-const exchangeRequestInclude = {
-  fromCoin: { include: { mappings: { where: { isActive: true }, include: { network: true } } } },
-  toCoin: { include: { mappings: { where: { isActive: true }, include: { network: true } } } },
-  fromNetwork: true,
-  toNetwork: true,
-  depositAddress: true,
-  transactions: { orderBy: { createdAt: "desc" as const } },
 }
 
 // ─── Route handler ──────────────────────────────────────────
@@ -225,104 +214,14 @@ export async function handleRestRequest(
     }
 
     try {
-      const fromUpper = String(from).toUpperCase()
-      const toUpper = String(to).toUpperCase()
-      const fromNetUpper = String(fromNetwork).toUpperCase()
-      const toNetUpper = String(toNetwork).toUpperCase()
-      const trimmedAddress = String(address).trim()
-      if (!trimmedAddress) return error("Withdraw address is required")
-
-      const [fromCoin, toCoin] = await Promise.all([
-        prisma.coin.findFirst({ where: { code: fromUpper, status: "ACTIVE" } }),
-        prisma.coin.findFirst({ where: { code: toUpper, status: "ACTIVE" } }),
-      ])
-      if (!fromCoin) return error(`Coin ${fromUpper} not found or inactive`, 404)
-      if (!toCoin) return error(`Coin ${toUpper} not found or inactive`, 404)
-
-      const [fromNet, toNet] = await Promise.all([
-        resolveNetwork(prisma, fromNetUpper),
-        resolveNetwork(prisma, toNetUpper),
-      ])
-      if (!fromNet) return error(`Network ${fromNetUpper} not found or inactive`, 404)
-      if (!toNet) return error(`Network ${toNetUpper} not found or inactive`, 404)
-
-      const [fromMapping, toMapping] = await Promise.all([
-        prisma.coinNetworkMapping.findUnique({
-          where: { coinId_networkId: { coinId: fromCoin.id, networkId: fromNet.id } },
-        }),
-        prisma.coinNetworkMapping.findUnique({
-          where: { coinId_networkId: { coinId: toCoin.id, networkId: toNet.id } },
-        }),
-      ])
-      if (!fromMapping?.isActive || !fromMapping.depositEnabled) {
-        return error(`Deposits for ${fromUpper} on ${fromNetUpper} are not available`)
-      }
-      if (!toMapping?.isActive || !toMapping.withdrawEnabled) {
-        return error(`Withdrawals for ${toUpper} on ${toNetUpper} are not available`)
-      }
-
-      const inputAmount = new Prisma.Decimal(String(amount))
-      if (inputAmount.lte(0)) return error("Amount must be positive")
-      if (inputAmount.lt(fromCoin.minDepositAmount)) {
-        return error(`Amount below minimum of ${fromCoin.minDepositAmount} ${fromUpper}`)
-      }
-      if (fromCoin.maxDepositAmount && inputAmount.gt(fromCoin.maxDepositAmount)) {
-        return error(`Amount above maximum of ${fromCoin.maxDepositAmount} ${fromUpper}`)
-      }
-
-      const rate = await getKmsRate(fromCoin.code, toCoin.code)
-      let feeAmount = inputAmount.mul(fromCoin.floatFeePercent).div(100)
-      if (feeAmount.lt(fromCoin.minimumFee)) feeAmount = fromCoin.minimumFee
-      const toAmount = inputAmount.minus(feeAmount).mul(rate)
-
-      const masterWallet = await prisma.masterWallet.findFirst({
-        where: { coinId: fromCoin.id, networkId: fromNet.id, status: "ACTIVE" },
+      const exchangeRequest = await createExchangeOrder(prisma, {
+        from: String(from),
+        fromNetwork: String(fromNetwork),
+        to: String(to),
+        toNetwork: String(toNetwork),
+        amount: String(amount),
+        address: String(address),
       })
-      if (!masterWallet) {
-        return error(`No active master wallet for ${fromUpper} on ${fromNetUpper}. Contact support.`, 503)
-      }
-
-      const exchangeRequest = await prisma.$transaction(
-        async (tx) => {
-          const updatedWallet = await tx.masterWallet.update({
-            where: { xpub: masterWallet.xpub },
-            data: { currentIndex: { increment: 1 }, generatedAddresses: { increment: 1 } },
-          })
-
-          const derivedAddress = await deriveDepositAddress({
-            xpub: masterWallet.xpub,
-            index: updatedWallet.currentIndex,
-            chain: fromNet.chain,
-          })
-
-          const depositAddress = await tx.depositAddress.create({
-            data: {
-              address: derivedAddress,
-              index: updatedWallet.currentIndex,
-              masterWalletxpub: masterWallet.xpub,
-            },
-          })
-          return tx.exchangeRequest.create({
-            data: {
-              orderId: generateOrderId(),
-              fromCoinId: fromCoin.id,
-              fromNetworkId: fromNet.id,
-              toCoinId: toCoin.id,
-              toNetworkId: toNet.id,
-              fromAmount: inputAmount,
-              toAmount,
-              clientWithdrawAddress: trimmedAddress,
-              depositAddressId: depositAddress.id,
-              status: "CREATED",
-              estimatedRate: rate,
-              feeAmount,
-            },
-            include: exchangeRequestInclude,
-          })
-        },
-        { timeout: 20_000, maxWait: 5_000 },
-      )
-
       return json({ result: serializeExchangeRequest(exchangeRequest), status: 200 })
     } catch (e: any) {
       return error(e.message, 500)

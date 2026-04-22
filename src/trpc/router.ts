@@ -3,8 +3,8 @@ import { z } from "zod"
 import { Prisma, PrismaClient } from "@prisma/client"
 import { resolveNetwork } from "../lib/resolveNetwork"
 import { validateApiKey } from "../lib/auth"
-import { generateOrderId } from "../lib/generateOrderId"
-import { getKmsRate, deriveDepositAddress } from "../lib/kms"
+import { getKmsRate } from "../lib/kms"
+import { createExchangeOrder, exchangeRequestInclude } from "../lib/orders"
 
 // ─── Context ────────────────────────────────────────────────
 
@@ -73,15 +73,6 @@ function serializeExchangeRequest(er: any) {
 
 const coinInclude = {
   mappings: { where: { isActive: true }, include: { network: true } },
-}
-
-const exchangeRequestInclude = {
-  fromCoin: { include: coinInclude },
-  toCoin: { include: coinInclude },
-  fromNetwork: true,
-  toNetwork: true,
-  depositAddress: true,
-  transactions: { orderBy: { createdAt: "desc" as const } },
 }
 
 // ─── Router ─────────────────────────────────────────────────
@@ -191,6 +182,8 @@ export const appRouter = t.router({
     }),
 
   // ── order.create ──────────────────────────────────────
+  // Delegates full exchange-creation flow (wallets, addresses, rate, notifications)
+  // to KMS `exchange.createRequest`. See src/lib/orders.ts.
   "order.create": protectedProcedure
     .input(
       z.object({
@@ -203,104 +196,7 @@ export const appRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const fromUpper = input.from.toUpperCase()
-      const toUpper = input.to.toUpperCase()
-      const fromNetUpper = input.fromNetwork.toUpperCase()
-      const toNetUpper = input.toNetwork.toUpperCase()
-      const trimmedAddress = input.address.trim()
-      if (!trimmedAddress) throw new Error("Withdraw address is required")
-
-      const [fromCoin, toCoin] = await Promise.all([
-        ctx.prisma.coin.findFirst({ where: { code: fromUpper, status: "ACTIVE" } }),
-        ctx.prisma.coin.findFirst({ where: { code: toUpper, status: "ACTIVE" } }),
-      ])
-      if (!fromCoin) throw new Error(`Coin ${fromUpper} not found or inactive`)
-      if (!toCoin) throw new Error(`Coin ${toUpper} not found or inactive`)
-
-      const [fromNet, toNet] = await Promise.all([
-        resolveNetwork(ctx.prisma, fromNetUpper),
-        resolveNetwork(ctx.prisma, toNetUpper),
-      ])
-      if (!fromNet) throw new Error(`Network ${fromNetUpper} not found or inactive`)
-      if (!toNet) throw new Error(`Network ${toNetUpper} not found or inactive`)
-
-      const [fromMapping, toMapping] = await Promise.all([
-        ctx.prisma.coinNetworkMapping.findUnique({
-          where: { coinId_networkId: { coinId: fromCoin.id, networkId: fromNet.id } },
-        }),
-        ctx.prisma.coinNetworkMapping.findUnique({
-          where: { coinId_networkId: { coinId: toCoin.id, networkId: toNet.id } },
-        }),
-      ])
-      if (!fromMapping?.isActive || !fromMapping.depositEnabled) {
-        throw new Error(`Deposits for ${fromUpper} on ${fromNetUpper} are not available`)
-      }
-      if (!toMapping?.isActive || !toMapping.withdrawEnabled) {
-        throw new Error(`Withdrawals for ${toUpper} on ${toNetUpper} are not available`)
-      }
-
-      const inputAmount = new Prisma.Decimal(input.amount)
-      if (inputAmount.lte(0)) throw new Error("Amount must be positive")
-      if (inputAmount.lt(fromCoin.minDepositAmount)) {
-        throw new Error(`Amount below minimum of ${fromCoin.minDepositAmount} ${fromUpper}`)
-      }
-      if (fromCoin.maxDepositAmount && inputAmount.gt(fromCoin.maxDepositAmount)) {
-        throw new Error(`Amount above maximum of ${fromCoin.maxDepositAmount} ${fromUpper}`)
-      }
-
-      const rate = await getKmsRate(fromCoin.code, toCoin.code)
-      let feeAmount = inputAmount.mul(fromCoin.floatFeePercent).div(100)
-      if (feeAmount.lt(fromCoin.minimumFee)) feeAmount = fromCoin.minimumFee
-      const toAmount = inputAmount.minus(feeAmount).mul(rate)
-
-      const masterWallet = await ctx.prisma.masterWallet.findFirst({
-        where: { coinId: fromCoin.id, networkId: fromNet.id, status: "ACTIVE" },
-      })
-      if (!masterWallet) {
-        throw new Error(`No active master wallet for ${fromUpper} on ${fromNetUpper}. Contact support.`)
-      }
-
-      const exchangeRequest = await ctx.prisma.$transaction(
-        async (tx) => {
-          const updatedWallet = await tx.masterWallet.update({
-            where: { xpub: masterWallet.xpub },
-            data: { currentIndex: { increment: 1 }, generatedAddresses: { increment: 1 } },
-          })
-
-          const derivedAddress = await deriveDepositAddress({
-            xpub: masterWallet.xpub,
-            index: updatedWallet.currentIndex,
-            chain: fromNet.chain,
-          })
-
-          const depositAddress = await tx.depositAddress.create({
-            data: {
-              address: derivedAddress,
-              index: updatedWallet.currentIndex,
-              masterWalletxpub: masterWallet.xpub,
-            },
-          })
-          return tx.exchangeRequest.create({
-            data: {
-              orderId: generateOrderId(),
-              fromCoinId: fromCoin.id,
-              fromNetworkId: fromNet.id,
-              toCoinId: toCoin.id,
-              toNetworkId: toNet.id,
-              fromAmount: inputAmount,
-              toAmount,
-              clientWithdrawAddress: trimmedAddress,
-              depositAddressId: depositAddress.id,
-              status: "CREATED",
-              estimatedRate: rate,
-              feeAmount,
-            },
-            include: exchangeRequestInclude,
-          })
-        },
-        { timeout: 20_000, maxWait: 5_000 },
-      )
-
+      const exchangeRequest = await createExchangeOrder(ctx.prisma, input)
       return serializeExchangeRequest(exchangeRequest)
     }),
 

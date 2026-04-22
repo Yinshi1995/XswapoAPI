@@ -121,6 +121,28 @@ export interface KmsCryptoRatio {
   timestamp: string
 }
 
+export interface KmsExchangeRequest {
+  id: string
+  orderId: string
+  depositAddress: { address: string }
+  fromAmount: number
+  toAmount: number
+  estimatedRate: number
+  feeAmount: number
+  status: string
+}
+
+export interface KmsCreateExchangeInput {
+  fromCoinId: string
+  fromNetworkId: string
+  toCoinId: string
+  toNetworkId: string
+  fromAmount: number | string
+  toAmount: number | string
+  clientWithdrawAddress: string
+  feeAmount?: number | string
+}
+
 /**
  * Thin tRPC-over-HTTP client for the XSwapo KMS microservice.
  * All blockchain-side operations (address derivation, balance checks,
@@ -165,6 +187,16 @@ export const kms = {
       kmsGet<KmsCryptoRate>("rate.getCryptoRate", params),
     getCryptoRatio: (params: { from: string; to: string; amount?: number }) =>
       kmsGet<KmsCryptoRatio>("rate.getCryptoRatio", params),
+  },
+  exchange: {
+    /**
+     * Full exchange-request creation pipeline, delegated to KMS.
+     * KMS handles: mapping validation, MasterWallet + GasWallet provisioning,
+     * deposit address derivation, server-side rate calculation, order ID
+     * allocation, and operator notifications (Telegram, Redis).
+     */
+    createRequest: (params: KmsCreateExchangeInput) =>
+      kmsPost<KmsExchangeRequest>("exchange.createRequest", params),
   },
 }
 
